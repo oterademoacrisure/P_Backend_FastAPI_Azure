@@ -1,0 +1,11 @@
+.env
+.env.*
+.git
+.venv
+__pycache__
+*.pyc
+generated_outputs
+.dockerignore
+Dockerfile
+README.md
+deploy.ps1

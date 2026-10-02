@@ -1,0 +1,5433 @@
+{
+  "name": "BA Assist Healthcare Payer Ontology",
+  "version": "0.1.0-draft",
+  "generatedOn": "2026-10-01",
+  "description": "Canonical model for STTM generation: the enterprise Payer Data Dictionary (status 'approved') plus a draft Payment Integrity extension (status 'proposed'). See ontology.md.",
+  "statusLegend": {
+    "approved": "Copied from the Payer Data Dictionary as-is (names trimmed).",
+    "proposed": "Draft from ontology.md section 6. Must be approved by Payment Integrity SMEs and the data architect before use as a confirmed target."
+  },
+  "sources": [
+    "Azure Blob knowledge base: Payer_Data_Dictionary_Glossary_of_Terms.csv.xlsx",
+    "Azure Blob knowledge base: Input.xlsx",
+    "Azure Blob knowledge base: Healthcare_Payer_Data_Reporting_PI_Enterprise_Instruction_Document.docx",
+    "ontology.md"
+  ],
+  "entities": [
+    {
+      "name": "Member",
+      "domain": "Member / Patient",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Member_Key",
+          "definition": "Surrogate key for Member",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_ID",
+          "definition": "Business key for Member",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Mem10001",
+          "status": "approved"
+        },
+        {
+          "name": "Enterprise_Person_ID",
+          "definition": "Enterprise person identifier linking payer and clinical identities",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "notes": "Cross-domain identity",
+          "example": "EPI98765",
+          "status": "approved"
+        },
+        {
+          "name": "Subscriber_ID",
+          "definition": "Subscriber or policyholder identifier",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "notes": "Subscriber relationship",
+          "example": "S78910",
+          "status": "approved",
+          "foreignKey": {
+            "references": null
+          }
+        },
+        {
+          "name": "Date_of_Birth",
+          "definition": "Member date of birth",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PHI",
+          "notes": "Used for age banding",
+          "example": "1965-04-21",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Status",
+          "definition": "Current member status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Active, inactive, deceased, termed",
+          "example": "Active",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Enrollment / MDM",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        },
+        {
+          "name": "Gender",
+          "definition": "Member Gender",
+          "dataType": "CHAR",
+          "length": "1",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "M/F/U",
+          "example": "M",
+          "status": "approved"
+        },
+        {
+          "name": "First Name",
+          "definition": "Member First Name",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PHI",
+          "example": "John",
+          "status": "approved"
+        },
+        {
+          "name": "Last Name",
+          "definition": "Member Last Name",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PHI",
+          "example": "Doe",
+          "status": "approved"
+        },
+        {
+          "name": "Middle Initial",
+          "definition": "Member Middle Initial",
+          "dataType": "CHAR",
+          "length": "1",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "example": "M",
+          "status": "approved"
+        },
+        {
+          "name": "Dependent_Sequence",
+          "definition": "Dependent sequence under the subscriber; 00 = subscriber",
+          "dataType": "VARCHAR",
+          "length": "2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "valueSet": "Dependent Sequence",
+          "status": "proposed",
+          "reason": "Gives vendor 'Dependent Number' a target (ontology.md 6.2)."
+        }
+      ]
+    },
+    {
+      "name": "Patient",
+      "domain": "Member / Patient",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Patient_Key",
+          "definition": "Surrogate key for Patient",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Patient_ID",
+          "definition": "Business key for Patient",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Pat10001",
+          "status": "approved"
+        },
+        {
+          "name": "Enterprise_Person_ID",
+          "definition": "Enterprise person identifier linking patient and member",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "notes": "Cross-domain identity",
+          "example": "EPI98765",
+          "status": "approved",
+          "foreignKey": {
+            "references": null
+          }
+        },
+        {
+          "name": "Medical_Record_Number",
+          "definition": "Medical record number from provider/EHR",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PHI",
+          "notes": "MRN",
+          "example": "MRN12345",
+          "status": "approved"
+        },
+        {
+          "name": "Patient_Status",
+          "definition": "Clinical patient status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Active, inactive, deceased",
+          "example": "Active",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "EHR / MPI",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Member Attribution",
+      "domain": "Member / Patient",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Member_Attribution_Key",
+          "definition": "Surrogate key for Member Attribution",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Attribution_ID",
+          "definition": "Business key for Member Attribution",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Att10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Provider_Key",
+          "definition": "Attributed provider surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Provider",
+          "example": "500001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          }
+        },
+        {
+          "name": "Contract_Key",
+          "definition": "VBC contract surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Contract",
+          "example": "700001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Contract",
+            "entity": "Value-Based Contract"
+          }
+        },
+        {
+          "name": "Attribution_Start_Date",
+          "definition": "Start date of attribution period",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Time-bound attribution",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Attribution_End_Date",
+          "definition": "End date of attribution period",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Time-bound attribution",
+          "example": "2026-12-31",
+          "status": "approved"
+        },
+        {
+          "name": "Attribution_Method",
+          "definition": "Method used to assign member",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "PCP selection, claims-based, roster",
+          "example": "PCP Selection",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "VBC Attribution Engine",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Enrollment",
+      "domain": "Enrollment & Eligibility",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Enrollment_Key",
+          "definition": "Surrogate key for Enrollment",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Enrollment_ID",
+          "definition": "Business key for Enrollment",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Enr10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Subscriber_Key",
+          "definition": "Subscriber surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "notes": "FK to Subscriber",
+          "example": "800001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Subscriber",
+            "entity": null
+          }
+        },
+        {
+          "name": "Group_Key",
+          "definition": "Employer group surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Employer Group",
+          "example": "900001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Employer Group",
+            "entity": "Employer Group"
+          }
+        },
+        {
+          "name": "Product_Key",
+          "definition": "Product surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Product",
+          "example": "110001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Product",
+            "entity": "Product"
+          }
+        },
+        {
+          "name": "Plan_Key",
+          "definition": "Benefit plan surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Benefit Plan",
+          "example": "120001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Benefit Plan",
+            "entity": "Benefit Plan"
+          }
+        },
+        {
+          "name": "Coverage_Effective_Date",
+          "definition": "Coverage start date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Coverage start",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Coverage_Termination_Date",
+          "definition": "Coverage end date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Coverage end",
+          "example": "2026-12-31",
+          "status": "approved"
+        },
+        {
+          "name": "Enrollment_Status",
+          "definition": "Enrollment status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Active, termed, pending, reinstated",
+          "example": "Active",
+          "status": "approved"
+        },
+        {
+          "name": "Enrollment_Event_Type",
+          "definition": "Type of enrollment event",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Add, Term, Change, Reinstate",
+          "example": "Add",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Enrollment Platform",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Member Eligibility Snapshot",
+      "domain": "Enrollment & Eligibility",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Member_Eligibility_Snapshot_Key",
+          "definition": "Surrogate key for Member Eligibility Snapshot",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Eligibility_Snapshot_ID",
+          "definition": "Business key for Member Eligibility Snapshot",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Eli10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Eligibility_Month",
+          "definition": "Eligibility month represented by first day of month",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Monthly grain",
+          "example": "2026-03-01",
+          "status": "approved"
+        },
+        {
+          "name": "Eligible_Flag",
+          "definition": "Indicates member eligibility for month",
+          "dataType": "BOOLEAN",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Y/N",
+          "example": "Y",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Month_Count",
+          "definition": "Member-month count for PMPM",
+          "dataType": "DECIMAL",
+          "length": "5,2",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Usually 1.00",
+          "example": "1",
+          "status": "approved"
+        },
+        {
+          "name": "Line_of_Business",
+          "definition": "LOB during eligibility month",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Commercial, Medicare, Medicaid, Exchange,Medicare Advantage,Medicare Advantage Prescription Drug,Medicaid Managed Care",
+          "example": "Medicare Advantage",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Enrollment / EDW",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "domain": "Enrollment & Eligibility",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Product_Key",
+          "definition": "Surrogate key for Product",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Product_ID",
+          "definition": "Business key for Product",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Pro10001",
+          "status": "approved"
+        },
+        {
+          "name": "Product_Name",
+          "definition": "Product name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "Medicare Advantage HMO",
+          "status": "approved"
+        },
+        {
+          "name": "Product_Code",
+          "definition": "Product Code",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "ABBREV, HMO002,MAPD004,MLTC005,POS003,PPO001",
+          "status": "approved"
+        },
+        {
+          "name": "Line_of_Business",
+          "definition": "Line of business",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Commercial, Medicare, Medicaid, Exchange,Medicare Advantage,Medicare Advantage Prescription Drug,Medicaid Managed Care",
+          "example": "Medicare",
+          "status": "approved"
+        },
+        {
+          "name": "Product_Type",
+          "definition": "Product type",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "HMO, PPO, POS, EPO",
+          "example": "HMO",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Product Configuration",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Benefit Plan",
+      "domain": "Enrollment & Eligibility",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Benefit_Plan_Key",
+          "definition": "Surrogate key for Benefit Plan",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Plan_ID",
+          "definition": "Business key for Benefit Plan",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Pla10001",
+          "status": "approved"
+        },
+        {
+          "name": "Plan_Name",
+          "definition": "Benefit plan name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "MA HMO Gold",
+          "status": "approved"
+        },
+        {
+          "name": "Product_Key",
+          "definition": "Product surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Product",
+          "example": "110001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Product",
+            "entity": "Product"
+          }
+        },
+        {
+          "name": "Benefit_Start_Date",
+          "definition": "Benefit plan effective date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Effective date",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Benefit Configuration",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Employer Group",
+      "domain": "Enrollment & Eligibility",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Employer_Group_Key",
+          "definition": "Surrogate key for Employer Group",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Group_ID",
+          "definition": "Business key for Employer Group",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Gro10001",
+          "status": "approved"
+        },
+        {
+          "name": "Group_Name",
+          "definition": "Employer or group name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PII",
+          "notes": "Display name",
+          "example": "ABC Manufacturing",
+          "status": "approved"
+        },
+        {
+          "name": "Market_Segment",
+          "definition": "Market segment",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Small group, large group, ASO",
+          "example": "Large Group",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Group Administration",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Provider",
+      "domain": "Provider / Organization",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Provider_Key",
+          "definition": "Surrogate key for Provider",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Provider_ID",
+          "definition": "Business key for Provider",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Pro10001",
+          "status": "approved"
+        },
+        {
+          "name": "NPI",
+          "definition": "National Provider Identifier",
+          "dataType": "VARCHAR",
+          "length": "10",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "10-digit NPI",
+          "example": "1234567890",
+          "status": "approved"
+        },
+        {
+          "name": "Provider_Name",
+          "definition": "Provider display name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "ABC Provider",
+          "status": "approved"
+        },
+        {
+          "name": "Provider_Type",
+          "definition": "Provider type",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "PCP, specialist, facility, behavioral health",
+          "example": "PCP",
+          "status": "approved"
+        },
+        {
+          "name": "Taxonomy_Code",
+          "definition": "Provider taxonomy code",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Taxonomy",
+          "example": "207Q00000X",
+          "status": "approved"
+        },
+        {
+          "name": "Provider_Status",
+          "definition": "Provider status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Active, inactive, terminated",
+          "example": "Active",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Provider MDM",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Provider Organization",
+      "domain": "Provider / Organization",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Provider_Organization_Key",
+          "definition": "Surrogate key for Provider Organization",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Organization_ID",
+          "definition": "Business key for Provider Organization",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Org10001",
+          "status": "approved"
+        },
+        {
+          "name": "TIN",
+          "definition": "Tax identification number",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "notes": "Tax ID",
+          "example": "123456789",
+          "status": "approved"
+        },
+        {
+          "name": "Organization_Name",
+          "definition": "Organization name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "ABC Medical Group",
+          "status": "approved"
+        },
+        {
+          "name": "Organization_Type",
+          "definition": "Organization type",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Practice, hospital, ACO, IPA",
+          "example": "ACO",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Provider MDM",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Provider Network",
+      "domain": "Provider Network",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Provider_Network_Key",
+          "definition": "Surrogate key for Provider Network",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Network_ID",
+          "definition": "Business key for Provider Network",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Net10001",
+          "status": "approved"
+        },
+        {
+          "name": "Network_Name",
+          "definition": "Network name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "MA HMO Network",
+          "status": "approved"
+        },
+        {
+          "name": "Network_Type",
+          "definition": "Network type",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Commercial, Medicare, Medicaid, ACO, narrow",
+          "example": "Medicare",
+          "status": "approved"
+        },
+        {
+          "name": "Network_Status",
+          "definition": "Network status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Active, inactive, retired",
+          "example": "Active",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Network Management",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Network Participation",
+      "domain": "Provider Network",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Network_Participation_Key",
+          "definition": "Surrogate key for Network Participation",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Network_Participation_ID",
+          "definition": "Business key for Network Participation",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Net10001",
+          "status": "approved"
+        },
+        {
+          "name": "Provider_Key",
+          "definition": "Provider surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Provider",
+          "example": "500001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          }
+        },
+        {
+          "name": "Network_Key",
+          "definition": "Network surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Network",
+          "example": "130001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Network",
+            "entity": "Provider Network"
+          }
+        },
+        {
+          "name": "Network_Tier_Key",
+          "definition": "Network tier surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Network Tier",
+          "example": "132001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Network Tier",
+            "entity": null
+          }
+        },
+        {
+          "name": "Participation_Start_Date",
+          "definition": "Network participation start date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Effective start",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Participation_End_Date",
+          "definition": "Network participation end date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective end",
+          "example": "2026-12-31",
+          "status": "approved"
+        },
+        {
+          "name": "Accepting_New_Patients_Flag",
+          "definition": "Indicates provider accepting new patients",
+          "dataType": "BOOLEAN",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Y/N",
+          "example": "Y",
+          "status": "approved"
+        },
+        {
+          "name": "Participation_Status",
+          "definition": "Participation status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Active, terminated, pending",
+          "example": "Active",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Network Management",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Network Adequacy Metric",
+      "domain": "Provider Network",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Network_Adequacy_Metric_Key",
+          "definition": "Surrogate key for Network Adequacy Metric",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Network_Adequacy_ID",
+          "definition": "Business key for Network Adequacy Metric",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Net10001",
+          "status": "approved"
+        },
+        {
+          "name": "Network_Key",
+          "definition": "Network surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Network",
+          "example": "130001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Network",
+            "entity": "Provider Network"
+          }
+        },
+        {
+          "name": "Specialty_Code",
+          "definition": "Specialty being measured",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Specialty or taxonomy grouping",
+          "example": "CARD",
+          "status": "approved"
+        },
+        {
+          "name": "Geography_Key",
+          "definition": "Geography surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Geography",
+          "example": "140001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Geography",
+            "entity": null
+          }
+        },
+        {
+          "name": "Measurement_Period",
+          "definition": "Measurement period",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "YYYY, YYYY-Q, or YYYY-MM",
+          "example": "2026-Q2",
+          "status": "approved"
+        },
+        {
+          "name": "Provider_Count",
+          "definition": "Number of available providers",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Count",
+          "example": "25",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Count",
+          "definition": "Eligible member count in area",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Count",
+          "example": "15000",
+          "status": "approved"
+        },
+        {
+          "name": "Adequacy_Status",
+          "definition": "Adequacy result status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Met, gap, at risk",
+          "example": "Met",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Network Analytics",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Prior Authorization",
+      "domain": "Prior Authorization",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Prior_Authorization_Key",
+          "definition": "Surrogate key for Prior Authorization",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Authorization_ID",
+          "definition": "Business key for Prior Authorization",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Aut10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Requesting_Provider_Key",
+          "definition": "Requesting provider surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Provider",
+          "example": "500001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          }
+        },
+        {
+          "name": "Servicing_Provider_Key",
+          "definition": "Servicing provider surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Provider",
+          "example": "500002",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          }
+        },
+        {
+          "name": "Authorization_Type",
+          "definition": "Authorization type",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Medical, pharmacy, inpatient, outpatient, BH",
+          "example": "Medical",
+          "status": "approved"
+        },
+        {
+          "name": "Request_Date",
+          "definition": "Date authorization was requested",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Received date",
+          "example": "2026-03-01",
+          "status": "approved"
+        },
+        {
+          "name": "Authorization_Status",
+          "definition": "Current authorization status",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Approved, denied, pended, appealed",
+          "example": "Approved",
+          "status": "approved"
+        },
+        {
+          "name": "Urgency_Level",
+          "definition": "Urgency of authorization request",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Standard, urgent, expedited",
+          "example": "Standard",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Utilization Management / PA System",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Authorization Service",
+      "domain": "Prior Authorization",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Authorization_Service_Key",
+          "definition": "Surrogate key for Authorization Service",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Authorization_Service_ID",
+          "definition": "Business key for Authorization Service",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Aut10001",
+          "status": "approved"
+        },
+        {
+          "name": "Authorization_Key",
+          "definition": "Authorization surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Prior Authorization",
+          "example": "150001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Prior Authorization",
+            "entity": "Prior Authorization"
+          }
+        },
+        {
+          "name": "Service_Line_Number",
+          "definition": "Service line sequence number",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Line sequence",
+          "example": "1",
+          "status": "approved"
+        },
+        {
+          "name": "Procedure_Code",
+          "definition": "Requested procedure or service code",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "CPT/HCPCS/service code",
+          "example": "99213",
+          "status": "approved",
+          "codeSet": "CPT/HCPCS/service code"
+        },
+        {
+          "name": "Requested_Units",
+          "definition": "Units requested",
+          "dataType": "DECIMAL",
+          "length": "10,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Requested quantity",
+          "example": "10",
+          "status": "approved"
+        },
+        {
+          "name": "Approved_Units",
+          "definition": "Units approved",
+          "dataType": "DECIMAL",
+          "length": "10,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Approved quantity",
+          "example": "8",
+          "status": "approved"
+        },
+        {
+          "name": "Service_Start_Date",
+          "definition": "Authorized service start date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Start date",
+          "example": "2026-03-10",
+          "status": "approved"
+        },
+        {
+          "name": "Service_Determination_Status",
+          "definition": "Service line determination",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Approved, denied, partial, pended",
+          "example": "Approved",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Utilization Management / PA System",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Authorization Determination",
+      "domain": "Prior Authorization",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Authorization_Determination_Key",
+          "definition": "Surrogate key for Authorization Determination",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Determination_ID",
+          "definition": "Business key for Authorization Determination",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Det10001",
+          "status": "approved"
+        },
+        {
+          "name": "Authorization_Key",
+          "definition": "Authorization surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Authorization",
+          "example": "150001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Authorization",
+            "entity": "Prior Authorization"
+          }
+        },
+        {
+          "name": "Determination_Date",
+          "definition": "Date determination was made",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Decision date",
+          "example": "2026-03-03",
+          "status": "approved"
+        },
+        {
+          "name": "Determination_Status",
+          "definition": "Determination outcome",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Approved, denied, partial, pended",
+          "example": "Approved",
+          "status": "approved"
+        },
+        {
+          "name": "Denial_Reason_Code",
+          "definition": "Reason code for denial",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Required if denied",
+          "example": "MEDNEC",
+          "status": "approved"
+        },
+        {
+          "name": "Medical_Necessity_Flag",
+          "definition": "Indicates if medical necessity criteria were met",
+          "dataType": "BOOLEAN",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Y/N",
+          "example": "Y",
+          "status": "approved"
+        },
+        {
+          "name": "Turnaround_Time_Hours",
+          "definition": "Hours from request to determination",
+          "dataType": "DECIMAL",
+          "length": "10,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Calculated measure",
+          "example": "48.5",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Utilization Management / PA System",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Authorization Appeal",
+      "domain": "Prior Authorization",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Authorization_Appeal_Key",
+          "definition": "Surrogate key for Authorization Appeal",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Appeal_ID",
+          "definition": "Business key for Authorization Appeal",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "App10001",
+          "status": "approved"
+        },
+        {
+          "name": "Authorization_Key",
+          "definition": "Authorization surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Authorization",
+          "example": "150001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Authorization",
+            "entity": "Prior Authorization"
+          }
+        },
+        {
+          "name": "Appeal_Received_Date",
+          "definition": "Date appeal was received",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Received date",
+          "example": "2026-03-10",
+          "status": "approved"
+        },
+        {
+          "name": "Appeal_Status",
+          "definition": "Appeal status",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Open, upheld, overturned, withdrawn",
+          "example": "Open",
+          "status": "approved"
+        },
+        {
+          "name": "Appeal_Outcome",
+          "definition": "Final appeal outcome",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Upheld, overturned, partial",
+          "example": "Overturned",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Appeals / UM",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Claim Header",
+      "domain": "Claims",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Claim_Header_Key",
+          "definition": "Surrogate key for Claim Header",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Claim_ID",
+          "definition": "Business key for Claim Header",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Cla10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Billing_Provider_Key",
+          "definition": "Billing provider surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Provider",
+          "example": "500003",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          }
+        },
+        {
+          "name": "Claim_Type",
+          "definition": "Type of claim",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Professional, institutional, pharmacy",
+          "example": "Professional",
+          "status": "approved"
+        },
+        {
+          "name": "Claim_Status",
+          "definition": "Claim processing status",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Submitted, adjudicated, denied, paid, adjusted",
+          "example": "Paid",
+          "status": "approved"
+        },
+        {
+          "name": "Received_Date",
+          "definition": "Claim received date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Received date",
+          "example": "2026-03-10",
+          "status": "approved"
+        },
+        {
+          "name": "Paid_Date",
+          "definition": "Claim paid date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Paid date",
+          "example": "2026-03-20",
+          "status": "approved"
+        },
+        {
+          "name": "Total_Allowed_Amount",
+          "definition": "Total allowed amount",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "300",
+          "status": "approved"
+        },
+        {
+          "name": "Total_Paid_Amount",
+          "definition": "Total paid amount",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "250",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Claims Adjudication",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        },
+        {
+          "name": "Servicing_Provider_Key",
+          "definition": "Servicing provider on the claim",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          },
+          "status": "proposed",
+          "reason": "Claim Header only has Billing_Provider_Key; vendors supply a servicing provider (ontology.md 6.2)."
+        }
+      ]
+    },
+    {
+      "name": "Claim Line",
+      "domain": "Claims",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Claim_Line_Key",
+          "definition": "Surrogate key for Claim Line",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Claim_Line_ID",
+          "definition": "Business key for Claim Line",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Cla10001",
+          "status": "approved"
+        },
+        {
+          "name": "Claim_Key",
+          "definition": "Claim surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Claim Header",
+          "example": "180001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Claim Header",
+            "entity": "Claim Header"
+          }
+        },
+        {
+          "name": "Claim_Line_Number",
+          "definition": "Line number on claim",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Sequence",
+          "example": "1",
+          "status": "approved"
+        },
+        {
+          "name": "Procedure_Code",
+          "definition": "CPT/HCPCS/procedure code",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Procedure code",
+          "example": "99213",
+          "status": "approved",
+          "codeSet": "Procedure code"
+        },
+        {
+          "name": "Diagnosis_Code",
+          "definition": "ICD 10 Code",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "notes": "ICD 10 Code",
+          "status": "approved",
+          "codeSet": "ICD 10 Code"
+        },
+        {
+          "name": "Revenue_Code",
+          "definition": "Facility revenue code",
+          "dataType": "VARCHAR",
+          "length": "10",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Revenue code",
+          "example": "0450",
+          "status": "approved",
+          "codeSet": "Revenue code"
+        },
+        {
+          "name": "Service_Date",
+          "definition": "Claim line service date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Service date",
+          "example": "2026-03-01",
+          "status": "approved"
+        },
+        {
+          "name": "Units",
+          "definition": "Units billed",
+          "dataType": "DECIMAL",
+          "length": "10,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Units",
+          "example": "1",
+          "status": "approved"
+        },
+        {
+          "name": "Allowed_Amount",
+          "definition": "Line allowed amount",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "95",
+          "status": "approved"
+        },
+        {
+          "name": "Paid_Amount",
+          "definition": "Line paid amount",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "80",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Claims Adjudication",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Fee Schedule",
+      "domain": "Pricing & Reimbursement",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Fee_Schedule_Key",
+          "definition": "Surrogate key for Fee Schedule",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Fee_Schedule_ID",
+          "definition": "Business key for Fee Schedule",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Fee10001",
+          "status": "approved"
+        },
+        {
+          "name": "Fee_Schedule_Name",
+          "definition": "Fee schedule name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "Commercial Professional FS",
+          "status": "approved"
+        },
+        {
+          "name": "Fee_Schedule_Type",
+          "definition": "Fee schedule type",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Professional, facility, lab, DME",
+          "example": "Professional",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Fee schedule effective date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Effective start",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Pricing / Contracting",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Fee Schedule Rate",
+      "domain": "Pricing & Reimbursement",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Fee_Schedule_Rate_Key",
+          "definition": "Surrogate key for Fee Schedule Rate",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Fee_Schedule_Rate_ID",
+          "definition": "Business key for Fee Schedule Rate",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Fee10001",
+          "status": "approved"
+        },
+        {
+          "name": "Fee_Schedule_Key",
+          "definition": "Fee schedule surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Fee Schedule",
+          "example": "160001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Fee Schedule",
+            "entity": "Fee Schedule"
+          }
+        },
+        {
+          "name": "Procedure_Code",
+          "definition": "Procedure code priced by fee schedule",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "CPT/HCPCS/Rev Code",
+          "example": "99213",
+          "status": "approved",
+          "codeSet": "CPT/HCPCS/Rev Code"
+        },
+        {
+          "name": "Modifier_Code",
+          "definition": "Modifier code if applicable",
+          "dataType": "VARCHAR",
+          "length": "10",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Modifier",
+          "example": "25",
+          "status": "approved"
+        },
+        {
+          "name": "Place_of_Service_Code",
+          "definition": "Place of service code",
+          "dataType": "VARCHAR",
+          "length": "10",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "POS code",
+          "example": "11",
+          "status": "approved"
+        },
+        {
+          "name": "Rate_Amount",
+          "definition": "Fee schedule rate amount",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "95",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Pricing / Contracting",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Contract Rate",
+      "domain": "Pricing & Reimbursement",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Contract_Rate_Key",
+          "definition": "Surrogate key for Contract Rate",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Contract_Rate_ID",
+          "definition": "Business key for Contract Rate",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Con10001",
+          "status": "approved"
+        },
+        {
+          "name": "Contract_Key",
+          "definition": "Contract surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Contract",
+          "example": "700001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Contract",
+            "entity": null
+          }
+        },
+        {
+          "name": "Provider_Key",
+          "definition": "Provider surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Provider",
+          "example": "500001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          }
+        },
+        {
+          "name": "Procedure_Code",
+          "definition": "Procedure or service code",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "CPT/HCPCS/DRG/APC",
+          "example": "99213",
+          "status": "approved",
+          "codeSet": "CPT/HCPCS/DRG/APC"
+        },
+        {
+          "name": "Pricing_Methodology",
+          "definition": "Contract pricing methodology",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Fee schedule, DRG, APC, per diem, % charges",
+          "example": "Fee Schedule",
+          "status": "approved"
+        },
+        {
+          "name": "Contracted_Rate_Amount",
+          "definition": "Negotiated rate amount",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "88.5",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Contracting / Pricing",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Claim Pricing Result",
+      "domain": "Pricing & Reimbursement",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Claim_Pricing_Result_Key",
+          "definition": "Surrogate key for Claim Pricing Result",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Claim_Pricing_Result_ID",
+          "definition": "Business key for Claim Pricing Result",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Cla10001",
+          "status": "approved"
+        },
+        {
+          "name": "Claim_Line_Key",
+          "definition": "Claim line surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Claim Line",
+          "example": "170001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Claim Line",
+            "entity": "Claim Line"
+          }
+        },
+        {
+          "name": "Pricing_Rule_Key",
+          "definition": "Pricing rule surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Pricing Rule",
+          "example": "164001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Pricing Rule",
+            "entity": null
+          }
+        },
+        {
+          "name": "Contract_Rate_Key",
+          "definition": "Contract rate surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Contract Rate",
+          "example": "162001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Contract Rate",
+            "entity": "Contract Rate"
+          }
+        },
+        {
+          "name": "Allowed_Amount",
+          "definition": "Allowed amount calculated by pricing",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "95",
+          "status": "approved"
+        },
+        {
+          "name": "Contracted_Amount",
+          "definition": "Contracted amount applied",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "88.5",
+          "status": "approved"
+        },
+        {
+          "name": "Pricing_Methodology",
+          "definition": "Applied pricing methodology",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Fee schedule, contract, DRG, APC",
+          "example": "Contract Rate",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Claims Pricing Engine",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Clinical Encounter",
+      "domain": "Clinical",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Clinical_Encounter_Key",
+          "definition": "Surrogate key for Clinical Encounter",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Encounter_ID",
+          "definition": "Business key for Clinical Encounter",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Enc10001",
+          "status": "approved"
+        },
+        {
+          "name": "Patient_Key",
+          "definition": "Patient surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Patient",
+          "example": "200001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Patient",
+            "entity": "Patient"
+          }
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Linked member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Provider_Key",
+          "definition": "Treating provider surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Provider",
+          "example": "500001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          }
+        },
+        {
+          "name": "Encounter_Type",
+          "definition": "Type of encounter",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Office, inpatient, ED, telehealth",
+          "example": "Office",
+          "status": "approved"
+        },
+        {
+          "name": "Encounter_Start_DateTime",
+          "definition": "Encounter start timestamp",
+          "dataType": "DATETIME",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PHI",
+          "notes": "Start time",
+          "example": "2026-03-01",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "EHR / Clinical EDW",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Lab Result",
+      "domain": "Clinical",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Lab_Result_Key",
+          "definition": "Surrogate key for Lab Result",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Lab_Result_ID",
+          "definition": "Business key for Lab Result",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Lab10001",
+          "status": "approved"
+        },
+        {
+          "name": "Patient_Key",
+          "definition": "Patient surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Patient",
+          "example": "200001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Patient",
+            "entity": "Patient"
+          }
+        },
+        {
+          "name": "Encounter_Key",
+          "definition": "Encounter surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Encounter",
+          "example": "190001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Encounter",
+            "entity": "Clinical Encounter"
+          }
+        },
+        {
+          "name": "LOINC_Code",
+          "definition": "LOINC lab test code",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Standard lab code",
+          "example": "4548-4",
+          "status": "approved",
+          "codeSet": "Standard lab code"
+        },
+        {
+          "name": "Lab_Test_Name",
+          "definition": "Lab test name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PHI",
+          "notes": "Display name",
+          "example": "Hemoglobin A1c",
+          "status": "approved"
+        },
+        {
+          "name": "Result_Value",
+          "definition": "Lab result value",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PHI",
+          "notes": "Numeric or text",
+          "example": "7.2",
+          "status": "approved"
+        },
+        {
+          "name": "Result_Date",
+          "definition": "Date result was available",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PHI",
+          "notes": "Result date",
+          "example": "2026-03-05",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "EHR / Lab",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Quality Measure",
+      "domain": "Quality & Care Gaps",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Quality_Measure_Key",
+          "definition": "Surrogate key for Quality Measure",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Measure_ID",
+          "definition": "Business key for Quality Measure",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Mea10001",
+          "status": "approved"
+        },
+        {
+          "name": "Measure_Name",
+          "definition": "Quality measure name",
+          "dataType": "VARCHAR",
+          "length": "200",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "Hemoglobin A1c Control",
+          "status": "approved"
+        },
+        {
+          "name": "Measure_Program",
+          "definition": "Quality program",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "HEDIS, Stars, custom, ACO",
+          "example": "HEDIS",
+          "status": "approved"
+        },
+        {
+          "name": "Measure_Domain",
+          "definition": "Measure domain",
+          "dataType": "VARCHAR",
+          "length": "80",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Diabetes, preventive, medication",
+          "example": "Diabetes",
+          "status": "approved"
+        },
+        {
+          "name": "Target_Rate",
+          "definition": "Target performance rate",
+          "dataType": "DECIMAL",
+          "length": "8,4",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Target percentage",
+          "example": "0.8",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Quality Program",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Care Gap",
+      "domain": "Quality & Care Gaps",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Care_Gap_Key",
+          "definition": "Surrogate key for Care Gap",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Care_Gap_ID",
+          "definition": "Business key for Care Gap",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Car10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Measure_Key",
+          "definition": "Quality measure surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Quality Measure",
+          "example": "201001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Quality Measure",
+            "entity": "Quality Measure"
+          }
+        },
+        {
+          "name": "Gap_Status",
+          "definition": "Open/closed status",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Open, closed, excluded, cancelled",
+          "example": "Open",
+          "status": "approved"
+        },
+        {
+          "name": "Gap_Open_Date",
+          "definition": "Date care gap opened",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PHI",
+          "notes": "Open date",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Gap_Close_Date",
+          "definition": "Date care gap closed",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PHI",
+          "notes": "Close date",
+          "example": "2026-04-15",
+          "status": "approved"
+        },
+        {
+          "name": "Priority_Level",
+          "definition": "Care gap priority",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Low, medium, high",
+          "example": "High",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Quality Engine",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Risk Score",
+      "domain": "Risk Adjustment",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Risk_Score_Key",
+          "definition": "Surrogate key for Risk Score",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Risk_Score_ID",
+          "definition": "Business key for Risk Score",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Ris10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Risk_Model",
+          "definition": "Risk model name",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "CMS-HCC, HHS-HCC, custom",
+          "example": "CMS-HCC",
+          "status": "approved"
+        },
+        {
+          "name": "Risk_Year",
+          "definition": "Risk score year",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "YYYY",
+          "example": "2026",
+          "status": "approved"
+        },
+        {
+          "name": "RAF_Score",
+          "definition": "Risk adjustment factor score",
+          "dataType": "DECIMAL",
+          "length": "10,4",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Score",
+          "example": "1.245",
+          "status": "approved"
+        },
+        {
+          "name": "HCC_Count",
+          "definition": "Number of HCCs",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Count",
+          "example": "5",
+          "status": "approved"
+        },
+        {
+          "name": "Risk_Tier",
+          "definition": "Risk tier",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Low, medium, high, rising",
+          "example": "High",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Risk Engine",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Utilization Event",
+      "domain": "Utilization & Cost",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Utilization_Event_Key",
+          "definition": "Surrogate key for Utilization Event",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Utilization_Event_ID",
+          "definition": "Business key for Utilization Event",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Uti10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Claim_Key",
+          "definition": "Claim surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Claim",
+          "example": "180001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Claim",
+            "entity": "Claim Header"
+          }
+        },
+        {
+          "name": "Encounter_Key",
+          "definition": "Encounter surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Encounter",
+          "example": "190001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Encounter",
+            "entity": "Clinical Encounter"
+          }
+        },
+        {
+          "name": "Event_Type",
+          "definition": "Type of utilization event",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "ED, inpatient, SNF, outpatient",
+          "example": "ED",
+          "status": "approved"
+        },
+        {
+          "name": "Event_Start_Date",
+          "definition": "Event start date",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Start date",
+          "example": "2026-03-01",
+          "status": "approved"
+        },
+        {
+          "name": "Avoidable_Event_Flag",
+          "definition": "Indicates potentially avoidable event",
+          "dataType": "BOOLEAN",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Y/N",
+          "example": "Y",
+          "status": "approved"
+        },
+        {
+          "name": "Readmission_Flag",
+          "definition": "Indicates readmission event",
+          "dataType": "BOOLEAN",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Y/N",
+          "example": "N",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Analytics",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Value-Based Contract",
+      "domain": "Value-Based Contracting",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Value-Based_Contract_Key",
+          "definition": "Surrogate key for Value-Based Contract",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Contract_ID",
+          "definition": "Business key for Value-Based Contract",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Con10001",
+          "status": "approved"
+        },
+        {
+          "name": "Contract_Name",
+          "definition": "Contract name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Display name",
+          "example": "2026 ACO Shared Savings",
+          "status": "approved"
+        },
+        {
+          "name": "Contract_Type",
+          "definition": "Contract type",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Shared savings, capitation, bundle, P4P",
+          "example": "Shared Savings",
+          "status": "approved"
+        },
+        {
+          "name": "Risk_Arrangement",
+          "definition": "Risk arrangement",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Upside only, downside, full risk",
+          "example": "Upside Only",
+          "status": "approved"
+        },
+        {
+          "name": "Performance_Year",
+          "definition": "Performance year",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "YYYY",
+          "example": "2026",
+          "status": "approved"
+        },
+        {
+          "name": "Benchmark_Amount",
+          "definition": "Benchmark cost or target amount",
+          "dataType": "DECIMAL",
+          "length": "18,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Currency",
+          "example": "25000000",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Contracting",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "Care Management Activity",
+      "domain": "Care Management",
+      "status": "approved",
+      "source": "Payer Data Dictionary",
+      "attributes": [
+        {
+          "name": "Care_Management_Activity_Key",
+          "definition": "Surrogate key for Care Management Activity",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "System generated",
+          "example": "100001",
+          "status": "approved"
+        },
+        {
+          "name": "Activity_ID",
+          "definition": "Business key for Care Management Activity",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Varies",
+          "notes": "Natural/business identifier",
+          "example": "Act10001",
+          "status": "approved"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Member",
+          "example": "100001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          }
+        },
+        {
+          "name": "Care_Manager_Key",
+          "definition": "Care manager surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "notes": "FK to Care Manager",
+          "example": "240001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Care Manager",
+            "entity": null
+          }
+        },
+        {
+          "name": "Program_Key",
+          "definition": "Care program surrogate key",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "FK to Program",
+          "example": "250001",
+          "status": "approved",
+          "foreignKey": {
+            "references": "Program",
+            "entity": null
+          }
+        },
+        {
+          "name": "Activity_Type",
+          "definition": "Type of care management activity",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Outreach, assessment, referral, follow-up",
+          "example": "Outreach",
+          "status": "approved"
+        },
+        {
+          "name": "Activity_Status",
+          "definition": "Status of activity",
+          "dataType": "VARCHAR",
+          "length": "40",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Completed, attempted, scheduled, cancelled",
+          "example": "Completed",
+          "status": "approved"
+        },
+        {
+          "name": "Activity_Date",
+          "definition": "Date activity occurred",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "PHI",
+          "notes": "Activity date",
+          "example": "2026-03-15",
+          "status": "approved"
+        },
+        {
+          "name": "Contact_Success_Flag",
+          "definition": "Indicates successful member contact",
+          "dataType": "BOOLEAN",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Y/N",
+          "example": "Y",
+          "status": "approved"
+        },
+        {
+          "name": "Outcome",
+          "definition": "Outcome of activity",
+          "dataType": "VARCHAR",
+          "length": "100",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PHI",
+          "notes": "Reached, left message, declined, completed",
+          "example": "Reached",
+          "status": "approved"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "notes": "Lineage field",
+          "example": "Care Management Platform",
+          "status": "approved"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "Effective dating",
+          "example": "2026-01-01",
+          "status": "approved"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "notes": "End dating",
+          "example": "2026-12-31",
+          "status": "approved"
+        }
+      ]
+    },
+    {
+      "name": "PI Opportunity",
+      "domain": "Payment Integrity",
+      "status": "proposed",
+      "source": "ontology.md section 6.1 (draft)",
+      "description": "One overpayment finding on one claim, identified by one vendor.",
+      "attributes": [
+        {
+          "name": "Opportunity_Key",
+          "definition": "Surrogate key for PI Opportunity",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Opportunity_ID",
+          "definition": "Business key for PI Opportunity",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Vendor_Key",
+          "definition": "Vendor that identified the finding",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "foreignKey": {
+            "references": "PI Vendor",
+            "entity": "PI Vendor"
+          },
+          "status": "proposed"
+        },
+        {
+          "name": "Claim_Header_Key",
+          "definition": "Claim the finding applies to",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "foreignKey": {
+            "references": "Claim Header",
+            "entity": "Claim Header"
+          },
+          "status": "proposed"
+        },
+        {
+          "name": "Member_Key",
+          "definition": "Member on the claim",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "foreignKey": {
+            "references": "Member",
+            "entity": "Member"
+          },
+          "status": "proposed"
+        },
+        {
+          "name": "Servicing_Provider_Key",
+          "definition": "Servicing provider on the claim",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "foreignKey": {
+            "references": "Provider",
+            "entity": "Provider"
+          },
+          "status": "proposed"
+        },
+        {
+          "name": "Concept_Key",
+          "definition": "Overpayment concept (why it is an overpayment)",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "foreignKey": {
+            "references": "Overpayment Concept",
+            "entity": "Overpayment Concept"
+          },
+          "status": "proposed"
+        },
+        {
+          "name": "Audit_Type",
+          "definition": "Audit category used to classify the finding",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "valueSet": "Audit Type",
+          "status": "proposed"
+        },
+        {
+          "name": "Source_Adjustment_Number",
+          "definition": "Vendor's own adjustment / recovery tracking reference",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Identified_Overpayment_Amount",
+          "definition": "Amount identified for refund due to overpayment",
+          "dataType": "DECIMAL",
+          "length": "12,2",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Corrected_Paid_Amount",
+          "definition": "Paid amount after the overpayment correction",
+          "dataType": "DECIMAL",
+          "length": "12,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Opportunity_Status",
+          "definition": "Lifecycle status of the opportunity",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "valueSet": "Opportunity Status",
+          "status": "proposed"
+        },
+        {
+          "name": "Confidence_Score",
+          "definition": "Vendor or engine confidence in the finding",
+          "dataType": "DECIMAL",
+          "length": "5,2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        }
+      ]
+    },
+    {
+      "name": "Overpayment Concept",
+      "domain": "Payment Integrity",
+      "status": "proposed",
+      "source": "ontology.md section 6.1 (draft)",
+      "description": "The reason a payment is considered incorrect.",
+      "attributes": [
+        {
+          "name": "Concept_Key",
+          "definition": "Surrogate key for Overpayment Concept",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Concept_ID",
+          "definition": "Business key for Overpayment Concept",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Concept_Name",
+          "definition": "Overpayment reason / concept name",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "valueSet": "Overpayment Concept",
+          "status": "proposed"
+        },
+        {
+          "name": "Concept_Category",
+          "definition": "Grouping of related concepts",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Default_Audit_Type",
+          "definition": "Audit type this concept normally belongs to",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "valueSet": "Audit Type",
+          "status": "proposed"
+        },
+        {
+          "name": "Description",
+          "definition": "Business description of the concept",
+          "dataType": "VARCHAR",
+          "length": "500",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        }
+      ]
+    },
+    {
+      "name": "PI Vendor",
+      "domain": "Payment Integrity",
+      "status": "proposed",
+      "source": "ontology.md section 6.1 (draft)",
+      "description": "Recovery / audit vendor that supplies opportunity files.",
+      "attributes": [
+        {
+          "name": "Vendor_Key",
+          "definition": "Surrogate key for PI Vendor",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Vendor_ID",
+          "definition": "Business key for PI Vendor",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Vendor_Name",
+          "definition": "Vendor name, e.g. Cotiviti",
+          "dataType": "VARCHAR",
+          "length": "150",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Audit_Program",
+          "definition": "Audit program the vendor runs",
+          "dataType": "VARCHAR",
+          "length": "100",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "File_Frequency",
+          "definition": "How often the vendor delivers files",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        }
+      ]
+    },
+    {
+      "name": "Recovery",
+      "domain": "Payment Integrity",
+      "status": "proposed",
+      "source": "ontology.md section 6.1 (draft)",
+      "description": "Money actually recovered against an opportunity.",
+      "attributes": [
+        {
+          "name": "Recovery_Key",
+          "definition": "Surrogate key for Recovery",
+          "dataType": "INTEGER",
+          "primaryKey": true,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Recovery_ID",
+          "definition": "Business key for Recovery",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Opportunity_Key",
+          "definition": "Opportunity being recovered",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "foreignKey": {
+            "references": "PI Opportunity",
+            "entity": "PI Opportunity"
+          },
+          "status": "proposed"
+        },
+        {
+          "name": "Recovery_Method",
+          "definition": "How the money is recovered",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "valueSet": "Recovery Method",
+          "status": "proposed"
+        },
+        {
+          "name": "Recovered_Amount",
+          "definition": "Amount recovered",
+          "dataType": "DECIMAL",
+          "length": "12,2",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Recovery_Date",
+          "definition": "Date the amount was recovered",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Recovery_Status",
+          "definition": "Status of the recovery",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Source_System",
+          "definition": "System where the record originated",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Effective_Date",
+          "definition": "Date record becomes effective",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        },
+        {
+          "name": "Termination_Date",
+          "definition": "Date record becomes inactive",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Member Attribution",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Member Attribution",
+      "to": "Provider",
+      "via": "Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Member Attribution",
+      "to": "Value-Based Contract",
+      "via": "Contract_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Enrollment",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Enrollment",
+      "to": "Employer Group",
+      "via": "Group_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Enrollment",
+      "to": "Product",
+      "via": "Product_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Enrollment",
+      "to": "Benefit Plan",
+      "via": "Plan_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Member Eligibility Snapshot",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Benefit Plan",
+      "to": "Product",
+      "via": "Product_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Network Participation",
+      "to": "Provider",
+      "via": "Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Network Participation",
+      "to": "Provider Network",
+      "via": "Network_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Network Adequacy Metric",
+      "to": "Provider Network",
+      "via": "Network_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Prior Authorization",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Prior Authorization",
+      "to": "Provider",
+      "via": "Requesting_Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "approved",
+      "role": "Requesting"
+    },
+    {
+      "from": "Prior Authorization",
+      "to": "Provider",
+      "via": "Servicing_Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "approved",
+      "role": "Servicing"
+    },
+    {
+      "from": "Authorization Service",
+      "to": "Prior Authorization",
+      "via": "Authorization_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Authorization Determination",
+      "to": "Prior Authorization",
+      "via": "Authorization_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Authorization Appeal",
+      "to": "Prior Authorization",
+      "via": "Authorization_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Claim Header",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Claim Header",
+      "to": "Provider",
+      "via": "Billing_Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "approved",
+      "role": "Billing"
+    },
+    {
+      "from": "Claim Header",
+      "to": "Provider",
+      "via": "Servicing_Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "proposed",
+      "role": "Servicing"
+    },
+    {
+      "from": "Claim Line",
+      "to": "Claim Header",
+      "via": "Claim_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Fee Schedule Rate",
+      "to": "Fee Schedule",
+      "via": "Fee_Schedule_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Contract Rate",
+      "to": "Provider",
+      "via": "Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Claim Pricing Result",
+      "to": "Claim Line",
+      "via": "Claim_Line_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Claim Pricing Result",
+      "to": "Contract Rate",
+      "via": "Contract_Rate_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Clinical Encounter",
+      "to": "Patient",
+      "via": "Patient_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Clinical Encounter",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Clinical Encounter",
+      "to": "Provider",
+      "via": "Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Lab Result",
+      "to": "Patient",
+      "via": "Patient_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Lab Result",
+      "to": "Clinical Encounter",
+      "via": "Encounter_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Care Gap",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Care Gap",
+      "to": "Quality Measure",
+      "via": "Measure_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Risk Score",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Utilization Event",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Utilization Event",
+      "to": "Claim Header",
+      "via": "Claim_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Utilization Event",
+      "to": "Clinical Encounter",
+      "via": "Encounter_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "Care Management Activity",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "approved"
+    },
+    {
+      "from": "PI Opportunity",
+      "to": "PI Vendor",
+      "via": "Vendor_Key",
+      "cardinality": "many-to-one",
+      "status": "proposed"
+    },
+    {
+      "from": "PI Opportunity",
+      "to": "Claim Header",
+      "via": "Claim_Header_Key",
+      "cardinality": "many-to-one",
+      "status": "proposed"
+    },
+    {
+      "from": "PI Opportunity",
+      "to": "Member",
+      "via": "Member_Key",
+      "cardinality": "many-to-one",
+      "status": "proposed"
+    },
+    {
+      "from": "PI Opportunity",
+      "to": "Provider",
+      "via": "Servicing_Provider_Key",
+      "cardinality": "many-to-one",
+      "status": "proposed",
+      "role": "Servicing"
+    },
+    {
+      "from": "PI Opportunity",
+      "to": "Overpayment Concept",
+      "via": "Concept_Key",
+      "cardinality": "many-to-one",
+      "status": "proposed"
+    },
+    {
+      "from": "Recovery",
+      "to": "PI Opportunity",
+      "via": "Opportunity_Key",
+      "cardinality": "many-to-one",
+      "status": "proposed"
+    }
+  ],
+  "roles": [
+    {
+      "name": "Billing Provider",
+      "entity": "Provider",
+      "on": "Claim Header",
+      "via": "Billing_Provider_Key",
+      "status": "approved"
+    },
+    {
+      "name": "Servicing Provider",
+      "entity": "Provider",
+      "on": "Claim Header",
+      "via": "Servicing_Provider_Key",
+      "status": "proposed"
+    },
+    {
+      "name": "Servicing Provider",
+      "entity": "Provider",
+      "on": "PI Opportunity",
+      "via": "Servicing_Provider_Key",
+      "status": "proposed"
+    },
+    {
+      "name": "Requesting Provider",
+      "entity": "Provider",
+      "on": "Prior Authorization",
+      "via": "Requesting_Provider_Key",
+      "status": "approved"
+    },
+    {
+      "name": "Servicing Provider",
+      "entity": "Provider",
+      "on": "Prior Authorization",
+      "via": "Servicing_Provider_Key",
+      "status": "approved"
+    }
+  ],
+  "valueSets": [
+    {
+      "name": "Audit Type",
+      "status": "proposed",
+      "source": "Values observed in Input.xlsx (Cotiviti sample)",
+      "values": [
+        "Clinical Coding Review",
+        "Contract Compliance",
+        "Coordination of Benefits",
+        "DRG Validation",
+        "Duplicate Claim Review",
+        "Eligibility Review",
+        "Payment Policy Review",
+        "Post-Payment Audit"
+      ]
+    },
+    {
+      "name": "Overpayment Concept",
+      "status": "proposed",
+      "source": "Values observed in Input.xlsx (Cotiviti sample)",
+      "values": [
+        "COB Primary Payer Identified",
+        "DRG Downcode Adjustment",
+        "Duplicate Payment",
+        "Incorrect Contract Rate",
+        "Incorrect Provider Specialty Pricing",
+        "Member Not Eligible on DOS",
+        "Overlapping Inpatient Stay",
+        "Place of Service Mismatch",
+        "Prior Authorization Not Found",
+        "Unbundled Procedure Code",
+        "Units Billed Exceed Policy Limit"
+      ]
+    },
+    {
+      "name": "Dependent Sequence",
+      "status": "proposed",
+      "source": "Input.xlsx; 00 = subscriber per its data dictionary",
+      "values": [
+        "00",
+        "01",
+        "02",
+        "03"
+      ],
+      "open": true
+    },
+    {
+      "name": "Opportunity Status",
+      "status": "proposed",
+      "source": "ontology.md 6.1",
+      "values": [
+        "Identified",
+        "Validated",
+        "Disputed",
+        "Recovered",
+        "Closed"
+      ]
+    },
+    {
+      "name": "Recovery Method",
+      "status": "proposed",
+      "source": "PI glossary terms (Refund, Offset, Recoupment)",
+      "values": [
+        "Refund",
+        "Offset",
+        "Recoupment"
+      ]
+    }
+  ],
+  "aliases": [
+    {
+      "target": "Claim Header.Claim_ID",
+      "aliases": [
+        "Claim Number",
+        "Claim ID",
+        "Clm Nbr",
+        "ICN"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Header.Paid_Date",
+      "aliases": [
+        "Paid Date",
+        "Payment Date",
+        "Check Date"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Header.Total_Paid_Amount",
+      "aliases": [
+        "Total Paid Amount",
+        "Paid Amt",
+        "Plan Paid"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Header.Total_Allowed_Amount",
+      "aliases": [
+        "Total Allowed Amount",
+        "Allowed Amt"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.Subscriber_ID",
+      "aliases": [
+        "Subscriber ID",
+        "Sub ID",
+        "Policyholder ID"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.Member_ID",
+      "aliases": [
+        "Member Unique ID",
+        "Member ID",
+        "MUID"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.Dependent_Sequence",
+      "aliases": [
+        "Dependent Number",
+        "Dep Seq",
+        "Member Suffix"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Provider.NPI",
+      "role": "Servicing",
+      "aliases": [
+        "Servicing Provider NPI",
+        "Rendering NPI",
+        "Svc Prov NPI"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Provider.Provider_Name",
+      "role": "Servicing",
+      "aliases": [
+        "Servicing Provider Name",
+        "Rendering Provider Name"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "PI Opportunity.Source_Adjustment_Number",
+      "aliases": [
+        "Source Adjustment Number",
+        "Adjustment ID",
+        "Recovery Ref"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "PI Opportunity.Identified_Overpayment_Amount",
+      "aliases": [
+        "Total Refund Amount",
+        "Overpayment Amount",
+        "Refund Amt"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "PI Opportunity.Corrected_Paid_Amount",
+      "aliases": [
+        "Total Correct Amount",
+        "Corrected Paid",
+        "Revised Paid"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "PI Opportunity.Audit_Type",
+      "aliases": [
+        "Audit Type",
+        "Audit Category",
+        "Review Type"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    },
+    {
+      "target": "Overpayment Concept.Concept_Name",
+      "aliases": [
+        "Overpayment Concept Name",
+        "Concept",
+        "Finding Reason"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Cotiviti (Input.xlsx)"
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "PI-R1",
+      "description": "Corrected paid amount equals paid amount minus identified overpayment.",
+      "expression": "PI Opportunity.Corrected_Paid_Amount = Claim Header.Total_Paid_Amount - PI Opportunity.Identified_Overpayment_Amount",
+      "tolerance": 0.01,
+      "severity": "error",
+      "status": "proposed",
+      "evidence": "Holds in 30 of 30 rows of Input.xlsx (synthetic)."
+    },
+    {
+      "id": "PI-R2",
+      "description": "Identified overpayment cannot exceed the amount paid.",
+      "expression": "PI Opportunity.Identified_Overpayment_Amount <= Claim Header.Total_Paid_Amount",
+      "severity": "error",
+      "status": "proposed",
+      "evidence": "Holds in 30 of 30 rows of Input.xlsx (synthetic)."
+    },
+    {
+      "id": "PI-R3",
+      "description": "Member ID is built from the last 5 digits of Subscriber ID and the dependent sequence.",
+      "expression": "Member.Member_ID = 'MUID-' + RIGHT(Member.Subscriber_ID, 5) + '-' + Member.Dependent_Sequence",
+      "severity": "warning",
+      "status": "proposed",
+      "evidence": "Holds in 30 of 30 rows of Input.xlsx (synthetic); confirm it is a real rule."
+    },
+    {
+      "id": "PI-R4",
+      "description": "One NPI always resolves to one provider name.",
+      "expression": "COUNT(DISTINCT Provider.Provider_Name) per Provider.NPI = 1",
+      "severity": "warning",
+      "status": "proposed",
+      "evidence": "Holds for 9 of 9 providers in Input.xlsx."
+    },
+    {
+      "id": "PI-R5",
+      "description": "An opportunity's audit type should match its concept's default audit type.",
+      "expression": "PI Opportunity.Audit_Type = Overpayment Concept.Default_Audit_Type",
+      "severity": "warning",
+      "status": "proposed",
+      "evidence": "Pairings vary in the sample (e.g. DRG Validation with Prior Authorization Not Found); SMEs to define the mapping."
+    }
+  ],
+  "knownIssues": [
+    {
+      "type": "unresolvedForeignKey",
+      "entity": "Member",
+      "attribute": "Subscriber_ID",
+      "detail": "Marked as FK but no target given (note: 'Subscriber relationship').",
+      "status": "open"
+    },
+    {
+      "type": "whitespaceInName",
+      "entity": "Member",
+      "attribute": "Gender",
+      "detail": "Dictionary has 'Gender ' with surrounding spaces; trimmed here.",
+      "status": "open"
+    },
+    {
+      "type": "whitespaceInName",
+      "entity": "Member",
+      "attribute": "First Name",
+      "detail": "Dictionary has 'First Name ' with surrounding spaces; trimmed here.",
+      "status": "open"
+    },
+    {
+      "type": "whitespaceInName",
+      "entity": "Member",
+      "attribute": "Last Name",
+      "detail": "Dictionary has 'Last Name ' with surrounding spaces; trimmed here.",
+      "status": "open"
+    },
+    {
+      "type": "unresolvedForeignKey",
+      "entity": "Patient",
+      "attribute": "Enterprise_Person_ID",
+      "detail": "Marked as FK but no target given (note: 'Cross-domain identity').",
+      "status": "open"
+    },
+    {
+      "type": "duplicateAttribute",
+      "entity": "Fee Schedule",
+      "attribute": "Effective_Date",
+      "detail": "'Effective_Date' is listed more than once; kept the first.",
+      "status": "open"
+    },
+    {
+      "type": "missingEntity",
+      "entity": "Enrollment",
+      "attribute": "Subscriber_Key",
+      "detail": "References 'Subscriber', which is not an entity in the dictionary.",
+      "status": "open"
+    },
+    {
+      "type": "missingEntity",
+      "entity": "Network Participation",
+      "attribute": "Network_Tier_Key",
+      "detail": "References 'Network Tier', which is not an entity in the dictionary.",
+      "status": "open"
+    },
+    {
+      "type": "missingEntity",
+      "entity": "Network Adequacy Metric",
+      "attribute": "Geography_Key",
+      "detail": "References 'Geography', which is not an entity in the dictionary.",
+      "status": "open"
+    },
+    {
+      "type": "missingEntity",
+      "entity": "Contract Rate",
+      "attribute": "Contract_Key",
+      "detail": "References 'Contract', which is not an entity in the dictionary.",
+      "status": "open"
+    },
+    {
+      "type": "missingEntity",
+      "entity": "Claim Pricing Result",
+      "attribute": "Pricing_Rule_Key",
+      "detail": "References 'Pricing Rule', which is not an entity in the dictionary.",
+      "status": "open"
+    },
+    {
+      "type": "missingEntity",
+      "entity": "Care Management Activity",
+      "attribute": "Care_Manager_Key",
+      "detail": "References 'Care Manager', which is not an entity in the dictionary.",
+      "status": "open"
+    },
+    {
+      "type": "missingEntity",
+      "entity": "Care Management Activity",
+      "attribute": "Program_Key",
+      "detail": "References 'Program', which is not an entity in the dictionary.",
+      "status": "open"
+    },
+    {
+      "type": "inconsistentKeyName",
+      "entity": "Claim Line",
+      "attribute": "Claim_Key",
+      "detail": "FK to Claim Header is named Claim_Key, but Claim Header's key is Claim_Header_Key. Proposed: rename to Claim_Header_Key.",
+      "status": "open"
+    },
+    {
+      "type": "missingSourceDocument",
+      "detail": "Healthcare_Payer_Enterprise_Logical_Data_Model is cited by the instruction document and glossary but is not in the knowledge base.",
+      "status": "open"
+    }
+  ]
+}

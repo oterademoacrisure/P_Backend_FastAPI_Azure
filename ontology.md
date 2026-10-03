@@ -18,9 +18,9 @@
 | 1 | **The canonical model has no Payment Integrity entities.** For the Cotiviti file, 6 of 14 columns had nothing to map to, and they're the overpayment-specific ones. | The AI had to invent target tables and fields. The enterprise instruction document forbids exactly that. |
 | 2 | **The AI saw only ~3% of the data dictionary.** Search returns 2 chunks per document, and the dictionary is 64 chunks. | Even existing targets were often missing from the AI's view, so the same file could map differently on each run. |
 
-**What we built.** A **lightweight ontology**: the full data dictionary plus Payment Integrity entities, relationships, provider roles, vendor aliases, allowed values and business rules, kept in one JSON file ([`ontology.json`](ontology.json)). The backend now:
+**What we built.** A **lightweight ontology for each project**. All projects share the same templates (STTM, Feature, User Story), but each has its own vendor columns, mappings and guardrail rules, so each gets **its own** JSON file, never shared. Two exist today: **Medical Claims** ([`ontology/medical-claims.json`](ontology/medical-claims.json)) and **Payment Integrity** ([`ontology/payment-integrity.json`](ontology/payment-integrity.json)). Each holds the full data dictionary plus that project's extension: entities, relationships, provider roles, vendor aliases, allowed values, business rules, and guardrail rules from the instruction document. §5.0 shows the end-to-end architecture. The backend now:
 
-1. **gives the AI the whole ontology** on every STTM and FRD request, instead of search fragments;
+1. **gives the AI the project's whole ontology** on every STTM and FRD request, instead of search fragments;
 2. **checks every target the AI writes** against the ontology, and sends the draft back for correction if a target is wrong;
 3. **enforces in code** that nothing unapproved ships as "Confirmed".
 
@@ -129,7 +129,7 @@ The two documents that matter most for mapping are the ones the AI saw least of.
 | 7 FKs point at entities that don't exist (Subscriber, Network Tier, Geography, Contract, Pricing Rule, Care Manager, Program) | Dictionary · various | Those joins can't be mapped |
 | 2 attributes are marked as FKs with no target (`Member.Subscriber_ID`, `Patient.Enterprise_Person_ID`) | Dictionary · Member / Patient | The relationship is unclear |
 
-All of these are recorded in `ontology.json` under `knownIssues` (15 open items), so they're tracked rather than lost.
+All of these are recorded in the Payment Integrity ontology under `knownIssues` (15 open items), so they're tracked rather than lost.
 
 ### What these gaps caused
 
@@ -142,9 +142,9 @@ All of these are recorded in `ontology.json` under `knownIssues` (15 open items)
 
 ## 4. What "ontology" means here
 
-An **ontology** is a formal, machine-usable description of the business domain: what exists, what it's called, how things relate, and which rules apply. Ours has seven parts:
+An **ontology** is a formal, machine-usable description of the business domain: what exists, what it's called, how things relate, and which rules apply. Each project's ontology has eight parts (counts are for Payment Integrity):
 
-| Part | Question it answers | Example | Count in `ontology.json` |
+| Part | Question it answers | Example | Count (Payment Integrity) |
 |---|---|---|---|
 | **Entities** | What business objects exist? | Claim Header, Member, **PI Opportunity** | 35 (31 approved, 4 proposed) |
 | **Attributes** | What fields, with what type? | `PI Opportunity.Identified_Overpayment_Amount` DECIMAL | 371 (326 approved, 45 proposed) |
@@ -153,6 +153,7 @@ An **ontology** is a formal, machine-usable description of the business domain: 
 | **Aliases** | What do vendors call this field? | "Total Refund Amount", "Refund Amt" → `Identified_Overpayment_Amount` | 14 groups |
 | **Value sets** | Which values are allowed? | Audit Type ∈ {Coordination of Benefits, DRG Validation, …} | 5 |
 | **Rules** | What must always be true? | Corrected Paid = Paid − Overpayment | 5 |
+| **Guardrails** | Which project rules must every output follow? | "Never invent source tables…"; "missing target column → Set as Default Value" | 12, from the project's instruction document |
 
 Every item carries `"status": "approved"` (copied from the Payer Data Dictionary) or `"proposed"` (the draft PI extension). That status is what the pipeline enforces (§5).
 
@@ -160,12 +161,189 @@ Every item carries `"status": "approved"` (copied from the Payer Data Dictionary
 
 ## 5. After: how the ontology is applied now
 
+### In plain words: one request, start to finish
+
+Take a user assigned to **Medical Claims** who uploads `vendor3_medical_claims_claim_line.xlsx` and ticks **STTM**.
+
+```mermaid
+flowchart LR
+    A["1 · User uploads<br/>vendor file"] --> B["2 · Backend knows the project<br/>(admin assignment)"]
+    B --> C["3 · Gathers knowledge"]
+    C --> D["4 · AI drafts<br/>the STTM"]
+    D --> E["5 · Code checks<br/>the draft"]
+    E -- "problems found" --> D
+    E -- "OK" --> F["6 · Template filled<br/>and downloaded"]
+```
+
+| Step | What happens | Where the information comes from |
+|---|---|---|
+| 1 | The user uploads the vendor file and gives an instruction | The user |
+| 2 | The backend looks up which project the user belongs to: Medical Claims | Admin Register page (Cosmos DB) |
+| 3a | It reads the **template and the rules documents**: what an STTM looks like, how to write it | **Common** documents in Blob, found through **Azure AI Search** |
+| 3b | It reads the **project's ontology**: which target fields exist for this project, what vendors call them, which rules apply | **`medical-claims.json`**, read whole |
+| 3c | It reads the **vendor file**: every column and some sample rows | The upload |
+| 4 | Azure OpenAI writes the STTM using all three | — |
+| 5 | Code checks every row: does the target field exist in the ontology? Is every vendor column mapped? Is Mapping Confidence valid? Is an unapproved field marked "Confirmed"? Problems go back to the AI, up to 2 times. | The ontology |
+| 6 | The backend writes the result into the real `STTM_Data_Ingestion_Template.xlsx` and the user downloads it | Common template |
+
+**The one-line summary:** search supplies *how to write* the document (the shared templates and rules). The ontology supplies *what to map to* (this project's target fields). The vendor file supplies *what to map from*.
+
+### Why one JSON file per project, and what's really in them
+
+**Why the ontology can't come from search like the templates do.** To choose the right target for a vendor column, the AI has to see **every** possible target field. Search returns only the 2 best-matching pieces of each document, about 3% of the data dictionary. That's fine for "what does an STTM look like", but not for "which of 370 fields is the right one". So the target model is given to the AI whole, as a JSON file.
+
+**Why one file per project.** Projects use the same templates but map different vendor files to different targets, under different rules. The project-specific parts can't be shared:
+
+| | `payment-integrity.json` (Cotiviti overpayment file) | `medical-claims.json` (vendor3 claim-line file) |
+|---|---|---|
+| **Project-only target fields** | 44: PI Opportunity, Overpayment Concept, PI Vendor, Recovery, plus `Member.Dependent_Sequence` | 16: claim-line fields such as `Claim_Line_Status`, `Billed_Date`, `Modifier_1`, `Place_of_Service_Code`; provider `Tax_ID`, `Specialty` |
+| **Vendor aliases** | 14, e.g. "Total Refund Amount" → `PI Opportunity.Identified_Overpayment_Amount` | 36, e.g. "Billing Provider NPI" → `Provider.NPI` (Billing role) |
+| **Rules** | 5, e.g. PI-R1: corrected paid = paid − overpayment | 6, e.g. MC-R1: one row per claim + adjustment + line |
+| **Guardrails** | 12 (PI-G1…): overpayment and vendor-normalisation rules | 12 (MC-G1…): privacy of member names, Tax ID encryption, leading zeros in NPI/ZIP |
+| **Enterprise data dictionary** | 326 approved attributes (Member, Claim, Provider …) | **the same 326**, copied |
+
+If one shared file held both, a Medical Claims STTM could be "validated" against PI Opportunity fields, and the AI would see overpayment rules while mapping claim lines.
+
+**What's honestly not required: the copied dictionary.** About 90% of each file is the same enterprise dictionary, copied into both. That works, but a dictionary change has to be made in every project file. The cleaner design is **one shared core file plus a small file per project**:
+
+```
+sharepoint-docs/
+├── ontology-core.json                ← enterprise dictionary, once (31 entities, 326 attributes)
+├── medical-claims/ontology.json      ← only Medical's 16 fields, 36 aliases, 6 rules, 12 guardrails
+└── payment-integrity/ontology.json   ← only PI's 44 fields, 14 aliases, 5 rules, 12 guardrails
+```
+
+The backend would merge core + project file at request time, so the AI and the checks see exactly what they see today. **Recommended as the next step**: it doesn't change behaviour, it only removes the duplication.
+
+**Who maintains what:**
+
+| File | Owner | Changes when |
+|---|---|---|
+| Common templates and documents (Blob root) | BA lead | The enterprise template or standards change |
+| Enterprise dictionary (core) | Data architect | A canonical entity or attribute is added or changed |
+| Project ontology | Project SMEs | A new vendor or column arrives, or SMEs approve a proposed field (`proposed` → `approved`) |
+
+### 5.0 End to end: one common template, many projects
+
+BA Assist serves several projects, for example **Medical Claims** (vendor claim-line files) and **Payment Integrity** (vendor overpayment files). Every project uses **the same templates**: the STTM Data Ingestion template, Feature template and User Story template. What differs per project is the **vendor columns, the target fields, the mappings and the rules**. So the knowledge is split in two:
+
+```mermaid
+flowchart TB
+    subgraph Blob["Azure Blob Storage · container sharepoint-docs"]
+        direction TB
+        ROOT["<b>Container root: common to every project</b><br/>STTM_Data_Ingestion_Template.xlsx<br/>Feature Template.docx · User Story Template.docx<br/>Instruction document · Payer Data Dictionary<br/>Data Mapping Standards"]
+        P1["<b>medical-claims/</b><br/>ontology.json<br/>project documents (optional)"]
+        P2["<b>payment-integrity/</b><br/>ontology.json<br/>project documents (optional)"]
+        PN["<b>&lt;next-project&gt;/</b><br/>ontology.json …"]
+    end
+    IX[("Azure AI Search index<br/>chunks + vectors + storage_path")]
+    ROOT -- "indexer" --> IX
+    P1 -- "indexer" --> IX
+    P2 -- "indexer" --> IX
+```
+
+| Where | What lives there | How the backend reads it |
+|---|---|---|
+| **Container root** | The common templates and enterprise documents | **Azure AI Search**: hybrid keyword + vector search, filtered to the root plus the user's project folder |
+| **`<project-folder>/ontology.json`** | That project's target model: entities, attributes, aliases, value sets, rules, guardrails | **Read whole** by `ontology_service` (Blob first; repo `ontology/` copy as fallback) |
+| **`<project-folder>/` other files** | Any project-only documents | **Azure AI Search**, visible only to that project |
+| **The upload** | The vendor file the user attaches | Parsed per request and given to the AI in full |
+
+#### One request, end to end
+
+```mermaid
+flowchart LR
+    U["User logs in<br/>project assigned on the<br/>admin Register page"] --> UP["Uploads vendor file<br/>ticks STTM / FRD / Agile<br/>types an instruction"]
+    UP --> ACC{"Access check<br/>user ↔ client/project"}
+    ACC -- denied --> X["403"]
+    ACC -- ok --> G["Prompt Shields<br/>guardrail"]
+
+    subgraph K["Three knowledge sources, per request"]
+        direction TB
+        K1["<b>1 · Project ontology, in full</b><br/>targets · aliases · rules · guardrails"]
+        K2["<b>2 · AI Search (RAG)</b><br/>common template + instruction doc<br/>+ project folder, 2 best chunks/doc"]
+        K3["<b>3 · Uploaded vendor file</b><br/>every column and sample row"]
+    end
+
+    G --> GEN["Generate<br/>Azure OpenAI"]
+    K1 --> GEN
+    K2 --> GEN
+    K3 --> GEN
+
+    GEN --> CHK{"Checks in code"}
+    CHK -- "fail: specific feedback,<br/>up to 2 retries" --> GEN
+    CHK -- pass --> EN["Enforce confidence caps"]
+    EN --> GC["Groundedness check"]
+    GC --> OUT["Outputs"]
+
+    classDef new fill:#e8f6ef,stroke:#1e8449,color:#145a32;
+    class K1,CHK,EN new;
+```
+
+**The checks in code** run on every STTM draft:
+
+| Check | Catches | Fix |
+|---|---|---|
+| Column count | A row with a missing `|` that shifts columns | Retry |
+| Ontology targets | Entity or attribute not in the project's ontology (with "did you mean"), wrong data type | Retry |
+| Confidence values | Anything other than Confirmed / Candidate / Needs SME Review (seen live: question text in that column) | Retry, then fixed in code |
+| Proposed targets | A proposed (unapproved) target marked Confirmed | Retry, then capped at Candidate in code |
+| Coverage | A vendor column that is neither mapped nor raised as an open question (seen live: 5 of 14 dropped) | Retry |
+| Contradictions | Confirmed rows that also carry an open question | Retry |
+
+**Outputs, one per ticked format:**
+
+| Format | Structure comes from | Delivered as |
+|---|---|---|
+| **STTM** | `STTM_Data_Ingestion_Template.xlsx`: its text via search tells the AI the sections and columns; targets come from the project ontology. | **The template file itself, filled**: the backend opens the template (Blob root, or the repo's `templates/` copy) and writes the summary next to its labels and the rows under its headers, keeping its banner, styling, banding, widths and frozen headers. Downloaded via `GET /v2/download/{session_id}?output_format=STTM` (the UI's Download Excel button). |
+| **Agile Artifact** | `Feature Template.docx` / `User Story Template.docx`, via search | Word |
+| **FRD** | The FRD structure in the prompt (no FRD template in the common folder yet) | Word |
+
+#### Rules that keep projects apart
+
+| Rule | Why |
+|---|---|
+| **The project comes from the user's admin assignment**, not a picker | A user can only generate for the project they're assigned to |
+| **The ontology is chosen by that project** | Project A's targets and guardrails can never validate project B's STTM |
+| **Search is filtered to the root plus the project's own folder** | A project never sees another project's documents |
+| **No fallback to another project's ontology** | A project without one generates as before |
+| **Ontologies in Blob are re-read every 15 minutes** | SMEs update a project's model with no redeploy. A slow Blob read gives up after 10 seconds and uses the repo copy. |
+| **Guardrails live in the project's ontology** | The AI sees only ~5% of the instruction document through search. Copying each project's rules into its ontology means the AI gets all of them, every time. |
+
+#### Live results (2026-10-03, same template, two projects)
+
+Both runs used the real backend, Azure OpenAI and Azure AI Search, with the vendor sample files.
+
+| | Medical Claims (vendor3, 37 columns) | Payment Integrity (Cotiviti, 14 columns) |
+|---|---|---|
+| Template sections and columns | ✅ all 4 sections; 22 columns exactly as the template | ✅ all 4 sections; 22 columns exactly as the template |
+| Vendor columns covered | **37 of 37** (36 mapped; HCPCS raised as an open question) | **14 of 14** after the coverage check (first run: 9 of 14) |
+| Targets that exist in the project's ontology | **36 of 36** | **25 of 25**, across PI Opportunity, Claim Header, Member and Provider |
+| Mapping Confidence values valid | ✅ 15 Confirmed, 21 Candidate | ✅ after the new check (first run had question text in 5 rows) |
+| Provider roles | Billing and Servicing both map to `Provider.NPI` / `Provider_Name` by role | Servicing role via `PI Opportunity.Servicing_Provider_Key` |
+
+**Compared with the hand-made reference STTMs:** the reference Medical STTM targets fields that don't exist in the enterprise data dictionary, such as `Claim_Line.Claim_Number`, `Provider.Billing_Provider_NPI` and `Claim_Line.CPT4_Code`, and its Mapping Confidence column is shifted. The ontology flags those targets (tested), and the generated STTM uses dictionary attributes instead, such as `Claim Header.Claim_ID` and `Provider.NPI` (Billing role).
+
+#### Review findings and next steps
+
+| # | Finding | Impact | Action |
+|---|---|---|---|
+| 1 | **All indexed files are at the container root**; there are no project folders in `sharepoint-docs` | Every project shares all documents; project-only documents aren't possible yet | Create `medical-claims/`, `payment-integrity/` … and put each project's `ontology.json` and project-only files there. Keep common templates at the root. |
+| 2 | **The indexer has no schedule** | New or changed Blob files aren't searchable until someone runs the indexer | Set a schedule, e.g. hourly |
+| 3 | **No deletion detection** on the index | Deleted files leave stale chunks (e.g. `sample_adjudication_rules.docx`) | Enable soft-delete detection on the data source |
+| 4 | **Semantic ranker is configured but not used** | Tested: works and adds ~100 ms, but ranked the STTM template lower than plain hybrid for an STTM query | Leave off; compare both in the Phase 5 measurement |
+| 5 | **Blob reads time out from the dev machine** | Ontologies load from the repo copy locally | Check the storage account's network rules for the deployed backend; the 10-second fallback protects generation meanwhile |
+| 6 | **No FRD template** in the common folder, and FRD output has no section headings | FRD structure depends on the prompt only | Add an FRD template to the common folder, like Feature / User Story |
+| 7 | **Groundedness only scores the first 7,000 characters** of a draft | The score swings between runs (0.14–0.58 for the same file) and doesn't measure mapping quality | Treat it as indicative; use the ontology and coverage checks as the quality gate |
+| 8 | **Refine turns split edited rows** (fixed 2026-10-03): "add a validation rule to the Units row" was treated as a new row, leaving the edit reverted plus a duplicate | Fixed: an edit to the same Target Field Name is kept in place (`draft_repair._same_subject`); verified live |
+| 9 | **Vendor sample conflicts** (medical): all denied lines carry a Paid Date; two lines carry both CPT and HCPCS codes | The STTM raises these as open questions | Recorded in `medical-claims.json` `knownIssues` for SMEs |
+
 ### 5.1 The pipeline with the ontology
 
 ```mermaid
 flowchart LR
     U["Business user<br/>uploads vendor file<br/>+ instruction"]
-    ONT[("ontology.json<br/>35 entities · 371 attributes<br/>relationships · roles · aliases<br/>value sets · rules")]
+    ONT[("This project's ontology<br/>e.g. payment-integrity.json<br/>entities · attributes · relationships<br/>roles · aliases · value sets · rules<br/>guardrails")]
 
     subgraph API["BA Assist backend (FastAPI + LangGraph)"]
         G["Input guardrail<br/>Prompt Shields"]
@@ -278,7 +456,8 @@ The code never renames a target by itself: guessing a replacement in code could 
 | Validation rules in the STTM | Generic | 5 business rules + 5 value sets, cited by ID (e.g. `PI-R1`) |
 | Check that targets exist | None | Every row checked; up to 2 corrective retries |
 | "Confirmed" on an unapproved target | Possible | **Impossible**: enforced in code |
-| Onboarding a new vendor | Prompt or code changes | Add alias rows to `ontology.json` |
+| Onboarding a new vendor | Prompt or code changes | Add alias rows to the project's ontology |
+| A new project | Same shared prompt for everyone | Its own ontology file (from `ontology/_template.json`): its own columns, rules and guardrails |
 | Run-to-run consistency | Depends on which chunks are retrieved | The same full model every time |
 
 ### Worked example: one column
@@ -311,7 +490,8 @@ The target is real, the type is correct, and the confidence is honest. The SME's
 | 6 of 14 Cotiviti columns had no target | Each column of `Input.xlsx` compared with the 327 dictionary attributes | ✅ Measured |
 | Business rules PI-R1 to PI-R4 hold | Checked against all 30 rows of `Input.xlsx` (synthetic sample) | ✅ 30/30 rows; 9/9 providers |
 | The ontology reaches the prompt for STTM/FRD, and not for Agile | Unit tests | ✅ |
-| Wrong names, unknown targets, proposed-but-Confirmed rows and type mismatches are detected | 20 unit tests in `tests/test_ontology_service.py`, run against the real `ontology.json` | ✅ 20/20 pass |
+| Wrong names, unknown targets, proposed-but-Confirmed rows, invalid confidence values, type mismatches and dropped vendor columns are detected; each project uses only its own ontology | 38 unit tests in `tests/test_ontology_service.py`, run against the real Medical Claims and Payment Integrity ontologies, including per-project lookup, no cross-project fallback and invalid files | ✅ 38/38 pass |
+| Same template, two projects, live | Medical Claims and Payment Integrity STTMs generated through the real backend, Azure OpenAI and Azure AI Search (§5.0 live results) | ✅ 37/37 and 14/14 vendor columns covered; every target in the project's ontology |
 | The retry and enforcement loop works end to end | `generate_node` run with a stubbed AI. The first draft had `Claim Headers` (misspelled) and a proposed target marked Confirmed. The retry fixed the name; the AI kept "Confirmed"; the code capped it at "Candidate", wrote the Open Question and logged telemetry | ✅ Verified (simulated AI) |
 | Better STTMs on real generations | Phase 5 (§10): before/after on 3–5 vendor files | ⏳ **Not yet measured** |
 
@@ -321,7 +501,7 @@ The target is real, the type is correct, and the confidence is honest. The SME's
 
 ## 8. Ontology content (DRAFT Payment Integrity extension, needs SME approval)
 
-> **Machine-readable version:** [`ontology.json`](ontology.json) holds all of this plus the full existing dictionary.
+> **Machine-readable version:** [`ontology/payment-integrity.json`](ontology/payment-integrity.json) holds all of this plus the full existing dictionary and the 12 project guardrails (PI-G1 to PI-G12) taken from the instruction document.
 > ⚠️ Everything in this section is a **proposal**, worked out from `Input.xlsx` and the instruction document's "PI Canonical Entity" guidance. Until SMEs approve it, the pipeline caps it at "Candidate".
 
 ### 8.1 New Payment Integrity entities
@@ -428,7 +608,7 @@ Each new vendor adds rows here, not code. This meets the Feature Template's "onb
 
 **Why B is enough:** the whole model is ~9,000 tokens, a small part of `gpt-4.1-mini`'s context window. There's nothing to search, so the AI gets the complete model every time.
 
-**Is it a graph? Yes.** `ontology.json` already *is* a graph: the 35 entities are the nodes, and the 44 relationships and 5 roles are the edges. The AI receives the edges as a RELATIONSHIPS section and uses them for Join Logic. A graph **database** only adds run-time storage and querying of that graph. It becomes worth it if:
+**Is it a graph? Yes.** Each project's ontology file already *is* a graph: the 35 entities are the nodes, and the 44 relationships and 5 roles are the edges. The AI receives the edges as a RELATIONSHIPS section and uses them for Join Logic. A graph **database** only adds run-time storage and querying of that graph. It becomes worth it if:
 
 | Trigger | Why a graph database would then help |
 |---|---|
@@ -437,7 +617,7 @@ Each new vendor adds rows here, not code. This meets the Feature Template's "onb
 | Lineage across many STTMs (source → Bronze → Silver → Gold → report) | Lineage is naturally a graph |
 | Several teams editing at once, with versioning and access control per entity | A database handles this better than a file |
 
-None of these apply today. `ontology.json` can be loaded into a graph database later without changes, so starting with the file costs nothing.
+None of these apply today. The ontology files can be loaded into a graph database later without changes, so starting with the file costs nothing.
 
 ---
 
@@ -447,17 +627,19 @@ None of these apply today. `ontology.json` can be loaded into a graph database l
 flowchart LR
     A["New vendor file or<br/>SME finding"] --> B["Propose change<br/>add alias / attribute / entity<br/>status: proposed"]
     B --> C["SME + data architect<br/>review"]
-    C -- approve --> D["Set status: approved<br/>in ontology.json"]
+    C -- approve --> D["Set status: approved<br/>in the project's ontology"]
     C -- reject --> X["Remove or revise"]
-    D --> E["Pull request +<br/>unit tests"]
-    E --> F["Redeploy"]
+    D --> E["Upload to Blob<br/>&lt;project-folder&gt;/ontology.json"]
+    E --> F["Live within 15 min<br/>(no redeploy)"]
     F --> G["GET /v2/ontology<br/>confirms live version"]
     G --> H["AI may now mark<br/>those targets Confirmed"]
 ```
 
 - **Proposed items are usable straight away**, but they're capped at "Candidate", so nothing unapproved is presented as final.
-- **Approval is a one-word change** (`proposed` → `approved`) with no code change. Every change goes through a pull request, so git gives a full audit trail.
-- **Inspect what's live:** `GET /v2/ontology` returns the version and counts by status, `?view=full` the JSON, and `?view=prompt` the exact text the AI receives.
+- **Approval is a one-word change** (`proposed` → `approved`) with no code change, made in that project's file only.
+- **Audit trail:** keep the approved copy of each project's file in the repo (`ontology/<project-folder>.json`) and change it through pull requests, then upload that file to Blob. Git then records who approved what.
+- **Inspect what's live:** `GET /v2/ontology?client_id=…&project_id=…` returns where that project's ontology was loaded from, its version and counts by status. `&view=full` gives the JSON, and `&view=prompt` the exact text the AI receives.
+- **New project:** copy `ontology/_template.json`, fill it from the project's own data dictionary, instruction document (guardrails) and a sample vendor file, mark everything `proposed`, and upload it as `<project-folder>/ontology.json`.
 
 ### Implementation plan and status
 
@@ -478,8 +660,9 @@ flowchart LR
 | **Token cost** | ~9,000 extra input tokens on each STTM/FRD AI call, repeated on each retry | No new infrastructure. Agile is excluded. Retries happen only when a violation is found. |
 | **Latency** | Each corrective retry is one more AI call (other retries in this pipeline take ~20s each) | At most 2 ontology retries; the code cap guarantees the key outcome without more retries |
 | **The AI may still use a wrong name** | The check catches it, but the code won't rename a target by itself | Logged in telemetry; the confidence cap stops it from shipping as "Confirmed" |
-| **Updates need a redeploy** | The ontology is a file in the repo, read at startup | Fine at the current rate of change. `ONTOLOGY_PATH` lets it move to Blob Storage later. |
-| **One shared model** | Every project uses the same ontology today | Per-project extensions can be added when a second project needs its own entities (decision 5) |
+| **Shared entities are copied** | Each project file carries its own copy of common entities (Member, Claim, Provider), so a dictionary change must be applied to each project | Matches how each project folder already carries its own data dictionary; split into shared core + project overlay later if this becomes a burden |
+| **No review gate on Blob uploads** | A file uploaded to Blob is live within 15 minutes | Limit write access to the container; keep the approved copy in the repo (`ontology/`) through pull requests |
+| **The search indexer will also index `ontology.json`** | Its JSON chunks may show up in narrative grounding | Exclude `.json` in the indexer's `excludedFileNameExtensions` |
 | **Validation covers the STTM mapping table** | FRDs get the ontology in the prompt but have no table to check | Acceptable: FRDs are narrative |
 | **The PI content is a draft** | Built from one synthetic vendor sample | SME approval (Phase 2); capped at "Candidate" until then |
 
@@ -491,7 +674,7 @@ flowchart LR
 2. **Name the owner** of the canonical model and ontology: who approves new entities and aliases?
 3. **Confirm the PI entities in §8.1**, especially whether *Recovery* should be separate from *PI Opportunity*.
 4. **Confirm the business rules in §8.6**, and define which concepts belong to which audit type.
-5. **Shared vs per-project:** which parts are enterprise-wide (Member, Claim, Provider) and which are specific to one project (PI concepts)?
+5. **Shared core + project files:** approve moving the enterprise dictionary into one `ontology-core.json`, so each project file holds only its own fields, aliases, rules and guardrails (§5, "Why one JSON file per project").
 6. **Supply the missing documents:** the Logical Data Model, and one approved PI example STTM.
 
 ---
@@ -508,18 +691,19 @@ flowchart LR
 | `Feature Template.docx`, `User Story Template.docx` | Canonical mapping, confidence scoring and "no hard-coding" requirements |
 | Azure AI Search index `rag-1788391708053` | Chunk counts and sizes per document (§3 Gap 2) |
 | `app/services/azure_search_service.py` | `CHUNKS_PER_DOCUMENT = 2` |
-| `tests/test_ontology_service.py` | 20 unit tests against the real `ontology.json` |
+| `tests/test_ontology_service.py` | 38 unit tests against the real Medical Claims and Payment Integrity ontologies |
 
 ## Appendix B: Where it lives in the code
 
 | File | Role |
 |---|---|
-| [`ontology.json`](ontology.json) | The ontology itself (override the location with `ONTOLOGY_PATH`) |
+| Blob `<project-folder>/ontology.json` | Each project's live ontology (container `ONTOLOGY_CONTAINER`, default `sharepoint-docs`) |
+| [`ontology/`](ontology/) | Local copies: `medical-claims.json`, `payment-integrity.json`, and `_template.json` for new projects (override with `ONTOLOGY_DIR`) |
 | [`app/services/ontology_service.py`](app/services/ontology_service.py) | Load, render the prompt block, validate, enforce, grounding excerpt, summary |
 | [`app/services/prompt_templates.py`](app/services/prompt_templates.py) | Adds the `CANONICAL ONTOLOGY` section to the system message |
 | [`app/graph.py`](app/graph.py) | `generate_node`: ontology retry loop and enforcement; `groundedness_node`: ontology excerpt |
 | [`app/main.py`](app/main.py) | Older `/generate`: ontology in the prompt; loads the ontology at startup |
-| [`app/routergenerator.py`](app/routergenerator.py) | `GET /v2/ontology` |
+| [`app/routergenerator.py`](app/routergenerator.py) | `GET /v2/ontology?client_id=…&project_id=…` |
 
 ## Appendix C: Glossary
 

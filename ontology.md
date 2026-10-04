@@ -32,6 +32,123 @@
 
 ---
 
+## The complete cycle, step by step
+
+This section is the walkthrough to present. It follows one request from upload to download, says **who** does each step, and gives the evidence behind it. Example: a user assigned to **Payment Integrity** uploads the Cotiviti overpayment file and ticks **STTM**.
+
+### The three kinds of knowledge
+
+| Kind | Documents | Shared? | How the backend uses it |
+|---|---|---|---|
+| **Format and rules** | `STTM_Data_Ingestion_Template.xlsx`, Feature and User Story templates, `Healthcare_Payer_Data_Reporting_PI_Enterprise_Instruction_Document.docx` (the collection of guardrails and standards), Data Mapping Standards | Common to every project (root of `sharepoint-docs`) | Searched with **Azure AI Search** for the relevant parts; the STTM template file itself is filled for download |
+| **Target model** | `Payer_Data_Dictionary_Glossary_of_Terms.csv.xlsx`, converted into each project's **`ontology.json`**, plus that project's extra fields, relationships, roles, aliases, value sets, rules and guardrails | One file per project | Given to the AI **whole**, and used by code to check the draft |
+| **Source** | The vendor Excel the user uploads: its data sheet **and its own Data Dictionary sheet** (what each column means) | Per request | Read in full, every sheet |
+
+### The cycle
+
+```mermaid
+flowchart TB
+    S1["① Login<br/>user's project from the<br/>admin Register page"] --> S2["② Upload<br/>vendor Excel (data sheet<br/>+ its Data Dictionary sheet)<br/>tick STTM, type instruction"]
+    S2 --> S3["③ Access + safety<br/>project access check ·<br/>Prompt Shields"]
+    S3 --> S4
+
+    subgraph S4["④ Gather knowledge (in parallel)"]
+        direction LR
+        K1["Format and rules<br/>Azure AI Search:<br/>template, instruction doc"]
+        K2["Target model<br/>project ontology.json<br/>(whole)"]
+        K3["Source<br/>uploaded Excel<br/>(every sheet)"]
+    end
+
+    S4 --> S5["⑤ Draft<br/>Azure OpenAI gpt-4.1-mini<br/>writes all 4 template sections"]
+    S5 --> S6{"⑥ Check in code<br/>columns · targets ·<br/>confidence · coverage ·<br/>contradictions"}
+    S6 -- "problem: specific feedback" --> S5
+    S6 -- "OK" --> S7["⑦ Enforce<br/>cap confidence of<br/>unapproved targets"]
+    S7 --> S8["⑧ Groundedness<br/>Azure Content Safety"]
+    S8 --> S9["⑨ Fill template<br/>real STTM_Data_Ingestion_<br/>Template.xlsx"]
+    S9 --> S10["⑩ Review, refine,<br/>download"]
+    S10 -- "refine instruction" --> S5
+```
+
+| # | Step | Who does it | What happens | Code |
+|---|---|---|---|---|
+| ① | **Login** | Backend + Cosmos DB | The user signs in. Their client and project (e.g. Excellus / Payment Integrity) come from the admin Register page; there's no project picker on the main page. | `auth_router.py`, `/v2/auth/me/projects` |
+| ② | **Upload** | User | Uploads the vendor Excel, ticks STTM, types an instruction ("Create STTM for the attached vendor file layout"). The Excel holds the data sheet **and** its Data Dictionary sheet, e.g. *Total Paid Amount: Original amount paid for the claim*. | `RequestForm.jsx` → `POST /v2/generate` |
+| ③ | **Access and safety** | Backend; Azure AI Content Safety | Rejects a user who isn't assigned to the project (403). **Prompt Shields** checks the instruction and the uploaded file for jailbreak / prompt-injection attempts. | `check_project_access`, `input_guardrail_node` |
+| ④a | **Format and rules** | **Azure AI Search** | Hybrid (keyword + vector) search, filtered to the common root plus the project's own folder. Returns the 2 most relevant chunks of each document: the **STTM template** (sections, 22 columns) and the **instruction document's rules**. | `azure_search_service.retrieve_grounding` |
+| ④b | **Target model** | Backend | Loads **this project's** `ontology.json`: Blob `sharepoint-docs/<project>/ontology.json` first, the repo copy if Blob is unavailable. Never another project's. | `ontology_service.get_ontology` |
+| ④c | **Source** | Backend | Reads every sheet of the uploaded Excel: column names, sample rows, and the vendor's Data Dictionary descriptions. | `file_extraction.extract_text` |
+| ⑤ | **Draft** | **Azure OpenAI (gpt-4.1-mini)**, orchestrated by LangGraph | One prompt combines everything. **System message:** the guardrails, the whole project ontology (target fields, aliases, relationships, rules, project guardrails), and the search results. **User message:** the instruction, the full vendor file, and the STTM format rules. The model writes all four sections: Summary, Mapping, Assumptions and Open Questions, SME Checklist. | `graph.generate_node` → `openai_service.generate_document` |
+| ⑥ | **Check in code** | Backend (deterministic, no AI) | Every row is checked; any problem goes back to the model with a specific correction, then is re-checked (details below). | `draft_repair.py`, `ontology_service.find_violations`, `find_unmapped_source_columns` |
+| ⑦ | **Enforce** | Backend | Whatever the model did: an unapproved (`proposed`) target is at most **Candidate**, a target not in the ontology at most **Needs SME Review**, an invalid confidence value becomes **Needs SME Review**, each with a written-out open question. | `ontology_service.enforce_confidence` |
+| ⑧ | **Groundedness** | Azure AI Content Safety | Scores how traceable the draft is to its sources (search results + the ontology entities it uses). Recorded with the result; indicative only (it reads the first 7,000 characters). | `groundedness_node` |
+| ⑨ | **Fill the template** | Backend | Opens the real `STTM_Data_Ingestion_Template.xlsx` and writes the summary next to its labels and every row under its headers, keeping its banner, styling and layout. Stamps today's date. | `template_service`, `xlsx_builder.fill_template` |
+| ⑩ | **Review, refine, download** | User | Reviews on screen. A refine instruction (e.g. "add a validation rule to the Units row") goes back through ④–⑨ on the same session, editing only what was asked. **Download Excel** returns the filled template. | `/v2/refine/{session}`, `/v2/download/{session}` |
+
+### Step ⑤ in detail: who plans and who drafts
+
+There is **no separate planning agent**. The plan is a **fixed pipeline** written in code with LangGraph, the same for every request: safety → gather → draft → check → enforce → groundedness → fill. Only the drafting step uses AI.
+
+| | Responsibility |
+|---|---|
+| **LangGraph (code)** | Decides the order of steps, runs the checks, decides when to send a draft back, saves each session (Cosmos DB) so it can be refined later |
+| **Azure OpenAI gpt-4.1-mini** | Drafting only: reads the vendor columns and their descriptions, picks each column's target from the ontology **by meaning**, and writes the STTM rows, assumptions and open questions |
+| **Code checks** | Judge the draft; the model never grades its own work |
+
+**How the model picks a target:** it compares the vendor's description of a column with the definition of every target attribute in the ontology. Aliases help with well-known names but aren't required, so a column can be called anything. Tested live: "Total Paid Amount" renamed to "rajneesh" still mapped to `Claim Header.Total_Paid_Amount` through its description, marked Candidate for SME confirmation; with the description removed, it was raised as an open question instead of guessed.
+
+### Step ⑥ in detail: the checks
+
+| Order | Check | Catches | Retries |
+|---|---|---|---|
+| 1 | **Column count** | A row missing a `|`, which shifts every later column | up to 3 |
+| 2 | **Ontology targets** | A target entity/attribute not in this project's ontology (with "did you mean"); a data type different from the ontology | up to 2 (shared with 3–5) |
+| 3 | **Confidence values** | Anything other than Confirmed / Candidate / Needs SME Review | ″ |
+| 4 | **Unapproved targets** | A `proposed` target marked Confirmed | ″ |
+| 5 | **Coverage** | A vendor column neither mapped nor raised as an open question (first draft only; on a refine the analyst may drop a column on purpose) | ″ |
+| 6 | **Contradictions** | A Confirmed row that also has an open question; a bare "Q004" instead of the actual question | up to 3 |
+| 7 | **Duplicates** | The same row emitted twice | fixed in code |
+
+### What each project's ontology contains
+
+`ontology.json` is the **Payer Data Dictionary, converted**, plus what the dictionary doesn't have:
+
+| Part | Source | Example |
+|---|---|---|
+| 31 entities, 326 attributes (`approved`) | Payer Data Dictionary, row by row: entity, attribute, definition, type, length, PK/FK, nullable, privacy, example | `Claim Header.Total_Paid_Amount` DECIMAL, "Total paid amount" |
+| Relationships | Derived from the dictionary's foreign keys | Claim Line → Claim Header (many-to-one) |
+| Provider roles | Instruction document reporting standards | Billing vs Servicing provider |
+| Project fields (`proposed`) | Fields the project needs that the dictionary lacks | PI Opportunity (Payment Integrity); `Claim_Line_Status` (Medical Claims) |
+| Aliases | Vendor sample files | "Total Refund Amount" → `PI Opportunity.Identified_Overpayment_Amount` |
+| Value sets | Vendor sample files | Audit Type: DRG Validation, Duplicate Claim Review … |
+| Rules | Checked against vendor sample data | PI-R1: corrected paid = paid − overpayment |
+| Guardrails | Copied from the instruction document | PI-G2: never invent source tables or fields |
+| Known issues | Problems found in the dictionary or samples | Duplicate `Effective_Date` in Fee Schedule |
+
+The Payer Data Dictionary stays the official source; the JSON is its machine-readable copy plus the project's extras.
+
+### Results (live, 2026-10-03/04)
+
+| | Before | Now |
+|---|---|---|
+| Medical Claims (37 vendor columns) | Hand-made reference STTM targets fields that don't exist in the dictionary (`Claim_Line.Claim_Number`, `Provider.Billing_Provider_NPI`) | **37/37** columns covered; **36/36** targets exist in the ontology |
+| Payment Integrity (14 vendor columns) | 6 columns had no target; first live run dropped 5 columns and put question text in Mapping Confidence | **14/14** covered, across PI Opportunity, Claim Header, Member, Provider; confidence values all valid |
+| Template | Workbook rebuilt in the browser | The real template file, filled |
+| Refine | "Add a rule to the Units row" left a duplicate row and reverted the edit | Edited in place |
+| Renamed column ("rajneesh") | — | Mapped by description; raised as an open question when no description exists |
+| Tests | — | 47 unit tests pass |
+
+### Recommended changes still open
+
+| # | Change | Why |
+|---|---|---|
+| 1 | **Stop retrieving the Payer Data Dictionary through search** | Today search still returns 2 chunks of it on every request, though the ontology already holds it complete. Excluding it saves prompt space and removes a second, partial copy. |
+| 2 | **Shared `ontology-core.json` + small project files** | About 90% of each project file is the same copied dictionary |
+| 3 | **Project folders in Blob** (`payment-integrity/`, `medical-claims/`) with each `ontology.json` | Today everything sits at the root and ontologies load from the repo copy |
+| 4 | **Indexer schedule and deletion detection** | New Blob files are only searchable after a manual run; deleted ones leave stale chunks |
+| 5 | **FRD (17 sections, instruction doc §19) and Agile (User Story template, §22)** | Next after STTM |
+
+---
+
 ## 2. Before: how STTM generation worked
 
 ```mermaid
@@ -187,6 +304,30 @@ flowchart LR
 | 6 | The backend writes the result into the real `STTM_Data_Ingestion_Template.xlsx` and the user downloads it | Common template |
 
 **The one-line summary:** search supplies *how to write* the document (the shared templates and rules). The ontology supplies *what to map to* (this project's target fields). The vendor file supplies *what to map from*.
+
+### Which document plays which role
+
+| Document | Side | Role |
+|---|---|---|
+| `Payer_Data_Dictionary_Glossary_of_Terms.csv.xlsx` (common) | **Target** | The enterprise canonical model: entity, attribute, definition, type, keys, privacy. It's the source of every `approved` item in the project ontologies. |
+| `Healthcare_Payer_Data_Reporting_PI_Enterprise_Instruction_Document.docx` (common) | **Rules** | The collection of guardrails and standards: STTM rules (§10, §20), FRD (§13, §19), Agile (§15, §22), data quality, security, guardrails. Search supplies parts of it; the STTM-relevant rules are also copied into each project ontology's `guardrails`, so none are missed. |
+| `STTM_Data_Ingestion_Template.xlsx`, Feature and User Story templates (common) | **Format** | What the output looks like. The STTM template file itself is filled for download. |
+| The vendor file the user uploads, including its own **Data Dictionary** sheet | **Source** | What each vendor column *means*, e.g. "Total Paid Amount: Original amount paid for the claim". |
+
+### How a vendor column is matched, even if it's renamed
+
+Matching is done by **meaning, not by name**. The AI is given the vendor's description of each column (from the file's Data Dictionary sheet) **and** the definition of every target attribute (from the project ontology), and it pairs them up. Aliases only speed up the common, well-named cases; they aren't required.
+
+**Tested live (2026-10-04):** "Total Paid Amount" in the Cotiviti file was renamed to **"rajneesh"**.
+
+| Test | What the vendor file contained | Result |
+|---|---|---|
+| A | Column "rajneesh", and its Data Dictionary row: *"Original amount paid for the claim."* | Mapped to **`Claim Header.Total_Paid_Amount`**, marked **Candidate**, with the note *"Field named 'rajneesh' in source represents original paid amount per data dictionary"* and an open question for an SME to confirm |
+| B | Column "rajneesh", **no** Data Dictionary sheet | **Not guessed.** Raised as an open question: *"'rajneesh' is numeric but no matching target attribute found; needs SME clarification"* |
+
+That's the intended behaviour: map by meaning when the source explains itself, and never invent a mapping when it doesn't (guardrail PI-G2, "never invent"). **Practical rule for vendors:** a Data Dictionary sheet with a one-line description per column is what makes a mapping reliable, whatever the columns are called.
+
+**Where Azure AI Search fits:** search doesn't do the column matching. It retrieves the **common documents** (template, instruction-document rules, standards) so the AI knows *how* to write the STTM. The *what maps to what* comes from the vendor descriptions plus the project ontology, both given in full.
 
 ### Why one JSON file per project, and what's really in them
 

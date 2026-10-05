@@ -3,9 +3,9 @@
   "client": "Excellus",
   "project": "Payment Integrity",
   "projectFolder": "excellus/payment-integrity",
-  "version": "0.1.0-draft",
-  "generatedOn": "2026-10-01",
-  "description": "Payment Integrity project's own canonical model for STTM generation: the enterprise Payer Data Dictionary (status 'approved') plus a draft Payment Integrity extension (status 'proposed'). One ontology per project; see ontology.md.",
+  "version": "0.2.0-draft",
+  "generatedOn": "2026-10-05",
+  "description": "Payment Integrity project's own canonical model for STTM generation: the enterprise Payer Data Dictionary (status 'approved') plus a draft Payment Integrity extension (status 'proposed'), covering vendor overpayment files (Cotiviti) and vendor claim-line files (vendor3). New input files need no new ontology: unmatched columns become Open Questions. See ontology.md.",
   "statusLegend": {
     "approved": "Copied from the Payer Data Dictionary as-is (names trimmed).",
     "proposed": "Draft from ontology.md section 6. Must be approved by Payment Integrity SMEs and the data architect before use as a confirmed target."
@@ -14,6 +14,7 @@
     "Azure Blob knowledge base: Payer_Data_Dictionary_Glossary_of_Terms.csv.xlsx",
     "Azure Blob knowledge base: Input.xlsx",
     "Azure Blob knowledge base: Healthcare_Payer_Data_Reporting_PI_Enterprise_Instruction_Document.docx",
+    "Azure Blob knowledge base: vendor3_medical_claims_claim_line.xlsx",
     "ontology.md"
   ],
   "entities": [
@@ -186,6 +187,17 @@
           "valueSet": "Dependent Sequence",
           "status": "proposed",
           "reason": "Gives vendor 'Dependent Number' a target (ontology.md 6.2)."
+        },
+        {
+          "name": "ZIP_Code",
+          "definition": "Member ZIP code; preserve leading zeros.",
+          "dataType": "VARCHAR",
+          "length": "10",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
         }
       ]
     },
@@ -1176,6 +1188,39 @@
           "notes": "End dating",
           "example": "2026-12-31",
           "status": "approved"
+        },
+        {
+          "name": "Tax_ID",
+          "definition": "Provider tax identifier (TIN); encrypt in transit and at rest.",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "PII",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
+        },
+        {
+          "name": "Specialty",
+          "definition": "Provider specialty description as supplied by the source.",
+          "dataType": "VARCHAR",
+          "length": "100",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
+        },
+        {
+          "name": "ZIP_Code",
+          "definition": "Provider practice ZIP code; preserve leading zeros.",
+          "dataType": "VARCHAR",
+          "length": "10",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
         }
       ]
     },
@@ -2426,6 +2471,16 @@
           },
           "status": "proposed",
           "reason": "Claim Header only has Billing_Provider_Key; vendors supply a servicing provider (ontology.md 6.2)."
+        },
+        {
+          "name": "Latest_Adjustment_Number",
+          "definition": "Current adjustment sequence of the claim snapshot; 1 = original adjudication.",
+          "dataType": "INTEGER",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
         }
       ]
     },
@@ -2602,6 +2657,130 @@
           "notes": "End dating",
           "example": "2026-12-31",
           "status": "approved"
+        },
+        {
+          "name": "Claim_Line_Status",
+          "definition": "Claim-line adjudication status.",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target.",
+          "valueSet": "Claim Line Status"
+        },
+        {
+          "name": "Billed_Date",
+          "definition": "Date the provider billed/submitted the claim line.",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
+        },
+        {
+          "name": "Paid_Date",
+          "definition": "Date payment or reversal was issued for the line; blank for unpaid pending/denied lines.",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
+        },
+        {
+          "name": "Procedure_Code_Type",
+          "definition": "Code system of Procedure_Code.",
+          "dataType": "VARCHAR",
+          "length": "10",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target.",
+          "valueSet": "Procedure Code Type"
+        },
+        {
+          "name": "Modifier_1",
+          "definition": "Primary procedure modifier (two characters).",
+          "dataType": "VARCHAR",
+          "length": "2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
+        },
+        {
+          "name": "Modifier_2",
+          "definition": "Secondary procedure modifier (two characters).",
+          "dataType": "VARCHAR",
+          "length": "2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
+        },
+        {
+          "name": "Diagnosis_Code_2",
+          "definition": "Secondary diagnosis code (ICD-10-CM).",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target.",
+          "codeSet": "ICD-10-CM"
+        },
+        {
+          "name": "Diagnosis_Code_3",
+          "definition": "Additional diagnosis code (ICD-10-CM).",
+          "dataType": "VARCHAR",
+          "length": "20",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target.",
+          "codeSet": "ICD-10-CM"
+        },
+        {
+          "name": "Place_of_Service_Code",
+          "definition": "CMS place of service code; preserve leading zeros.",
+          "dataType": "VARCHAR",
+          "length": "2",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target.",
+          "valueSet": "Place of Service"
+        },
+        {
+          "name": "Service_To_Date",
+          "definition": "Ending service date for the line (Service_Date is the start).",
+          "dataType": "DATE",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target."
+        },
+        {
+          "name": "Data_Classification",
+          "definition": "Whether the record is synthetic/test or production data.",
+          "dataType": "VARCHAR",
+          "length": "30",
+          "primaryKey": false,
+          "nullable": false,
+          "privacy": "Non-sensitive",
+          "status": "proposed",
+          "reason": "Gives a vendor3_medical_claims_claim_line.xlsx column a canonical target.",
+          "valueSet": "Data Classification"
         }
       ]
     },
@@ -5112,6 +5291,48 @@
         "Offset",
         "Recoupment"
       ]
+    },
+    {
+      "name": "Claim Line Status",
+      "status": "proposed",
+      "source": "vendor3_medical_claims_claim_line.xlsx Data Dictionary",
+      "values": [
+        "Paid",
+        "Denied",
+        "Pending",
+        "Partially Paid",
+        "Reversed"
+      ]
+    },
+    {
+      "name": "Procedure Code Type",
+      "status": "proposed",
+      "source": "vendor3_medical_claims_claim_line.xlsx Data Dictionary",
+      "values": [
+        "CPT",
+        "HCPCS"
+      ]
+    },
+    {
+      "name": "Place of Service",
+      "status": "proposed",
+      "open": true,
+      "source": "CMS place of service code set; values seen in vendor3_medical_claims_claim_line.xlsx",
+      "values": [
+        "11",
+        "20",
+        "22",
+        "24"
+      ]
+    },
+    {
+      "name": "Data Classification",
+      "status": "proposed",
+      "source": "vendor3_medical_claims_claim_line.xlsx Data Dictionary",
+      "values": [
+        "Synthetic/Test Data",
+        "Production"
+      ]
     }
   ],
   "aliases": [
@@ -5180,11 +5401,13 @@
       "aliases": [
         "Member Unique ID",
         "Member ID",
-        "MUID"
+        "MUID",
+        "Vendor Member ID"
       ],
       "status": "proposed",
       "observedIn": [
-        "Cotiviti (Input.xlsx)"
+        "Cotiviti (Input.xlsx)",
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
       ]
     },
     {
@@ -5283,6 +5506,357 @@
       "observedIn": [
         "Cotiviti (Input.xlsx)"
       ]
+    },
+    {
+      "target": "Claim Header.Latest_Adjustment_Number",
+      "aliases": [
+        "Latest Adjustment Number",
+        "Adjustment Sequence",
+        "Adj Seq"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Claim_Line_Status",
+      "aliases": [
+        "Claim Status",
+        "Line Status",
+        "Adjudication Status"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Claim_Line_Number",
+      "aliases": [
+        "Claim Line Number",
+        "Line Number",
+        "Line Nbr"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Paid_Amount",
+      "aliases": [
+        "Paid Amount",
+        "Line Paid Amt",
+        "Net Paid"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Allowed_Amount",
+      "aliases": [
+        "Allowed Amount",
+        "Line Allowed Amt"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Billed_Date",
+      "aliases": [
+        "Billed Date",
+        "Submission Date"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.First Name",
+      "aliases": [
+        "Member First Name",
+        "First Name"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.Last Name",
+      "aliases": [
+        "Member Last Name",
+        "Last Name"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.Date_of_Birth",
+      "aliases": [
+        "Member Date of Birth",
+        "DOB"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.Gender",
+      "aliases": [
+        "Member Gender",
+        "Gender",
+        "Sex"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Member.ZIP_Code",
+      "aliases": [
+        "Member ZIP Code",
+        "Member Zip"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Provider.NPI",
+      "aliases": [
+        "Billing Provider NPI",
+        "Billing NPI"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ],
+      "role": "Billing"
+    },
+    {
+      "target": "Provider.Provider_Name",
+      "aliases": [
+        "Billing Provider Name"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ],
+      "role": "Billing"
+    },
+    {
+      "target": "Provider.Tax_ID",
+      "aliases": [
+        "Billing Provider Tax ID",
+        "Billing TIN"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ],
+      "role": "Billing"
+    },
+    {
+      "target": "Provider.Specialty",
+      "aliases": [
+        "Billing Provider Specialty"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ],
+      "role": "Billing"
+    },
+    {
+      "target": "Provider.ZIP_Code",
+      "aliases": [
+        "Billing Provider ZIP Code"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ],
+      "role": "Billing"
+    },
+    {
+      "target": "Provider.Specialty",
+      "aliases": [
+        "Servicing Provider Specialty"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ],
+      "role": "Servicing"
+    },
+    {
+      "target": "Provider.ZIP_Code",
+      "aliases": [
+        "Servicing Provider ZIP Code"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ],
+      "role": "Servicing"
+    },
+    {
+      "target": "Claim Line.Diagnosis_Code",
+      "aliases": [
+        "Primary Diagnostics Code",
+        "Primary Diagnosis Code",
+        "Dx1"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Diagnosis_Code_2",
+      "aliases": [
+        "Diagnosis Code 2",
+        "Dx2"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Diagnosis_Code_3",
+      "aliases": [
+        "Diagnosis Code 3",
+        "Dx3"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Procedure_Code",
+      "aliases": [
+        "CPT4Code",
+        "CPT Code",
+        "HCPCS Code",
+        "Procedure Code"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Procedure_Code_Type",
+      "aliases": [
+        "Procedure Code Type",
+        "Code Type"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Modifier_1",
+      "aliases": [
+        "Modifier 1",
+        "Mod1"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Modifier_2",
+      "aliases": [
+        "Modifier 2",
+        "Mod2"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Revenue_Code",
+      "aliases": [
+        "Revenue Code",
+        "Rev Code"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Place_of_Service_Code",
+      "aliases": [
+        "Place of Service Code",
+        "POS"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Service_Date",
+      "aliases": [
+        "Service From Date",
+        "From Date of Service",
+        "DOS From"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Service_To_Date",
+      "aliases": [
+        "Service To Date",
+        "DOS To"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Units",
+      "aliases": [
+        "Units",
+        "Service Units"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
+    },
+    {
+      "target": "Claim Line.Data_Classification",
+      "aliases": [
+        "Data Classification"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "Vendor3 (vendor3_medical_claims_claim_line.xlsx)"
+      ]
     }
   ],
   "rules": [
@@ -5326,6 +5900,54 @@
       "severity": "warning",
       "status": "proposed",
       "evidence": "Pairings vary in the sample (e.g. DRG Validation with Prior Authorization Not Found); SMEs to define the mapping."
+    },
+    {
+      "id": "PI-R6",
+      "description": "Claim-line files: grain: one row per claim, adjustment and line.",
+      "expression": "UNIQUE(Claim Header.Claim_ID, Claim Header.Latest_Adjustment_Number, Claim Line.Claim_Line_Number)",
+      "severity": "error",
+      "status": "proposed",
+      "evidence": "Holds for 11 of 11 sample rows; stated in the vendor README."
+    },
+    {
+      "id": "PI-R7",
+      "description": "Claim-line files: service end date is on or after the service start date.",
+      "expression": "Claim Line.Service_To_Date >= Claim Line.Service_Date",
+      "severity": "error",
+      "status": "proposed",
+      "evidence": "Holds for 11 of 11 sample rows."
+    },
+    {
+      "id": "PI-R8",
+      "description": "Claim-line files: allowed amount is at least the paid amount, except on reversals.",
+      "expression": "Claim Line.Allowed_Amount >= Claim Line.Paid_Amount WHEN Claim Line.Claim_Line_Status <> 'Reversed'",
+      "severity": "warning",
+      "status": "proposed",
+      "evidence": "Holds for 11 of 11 sample rows."
+    },
+    {
+      "id": "PI-R9",
+      "description": "Claim-line files: a negative paid amount is only valid on a reversal.",
+      "expression": "Claim Line.Paid_Amount < 0 => Claim Line.Claim_Line_Status = 'Reversed'",
+      "severity": "error",
+      "status": "proposed",
+      "evidence": "Vendor dictionary: 'May be negative for reversals'."
+    },
+    {
+      "id": "PI-R10",
+      "description": "Claim-line files: denied and pending lines have no paid amount and no paid date.",
+      "expression": "Claim Line.Claim_Line_Status IN ('Denied','Pending') => Claim Line.Paid_Amount = 0 AND Claim Line.Paid_Date IS NULL",
+      "severity": "warning",
+      "status": "proposed",
+      "evidence": "Vendor dictionary says Paid Date is blank for unpaid lines, but all 3 denied sample lines carry a Paid Date (see knownIssues)."
+    },
+    {
+      "id": "PI-R11",
+      "description": "Claim-line files: nPIs are 10 digits; keep leading zeros.",
+      "expression": "LENGTH(Provider.NPI) = 10 AND Provider.NPI IS NUMERIC TEXT",
+      "severity": "error",
+      "status": "proposed",
+      "evidence": "Holds for all billing and servicing NPIs in the sample."
     }
   ],
   "knownIssues": [
@@ -5431,6 +6053,27 @@
       "type": "missingSourceDocument",
       "detail": "Healthcare_Payer_Enterprise_Logical_Data_Model is cited by the instruction document and glossary but is not in the knowledge base.",
       "status": "open"
+    },
+    {
+      "type": "sourceDataConflict",
+      "entity": "Claim Line",
+      "attribute": "Paid_Date",
+      "detail": "All 3 denied sample lines carry a Paid Date although the vendor dictionary says it is blank for unpaid lines.",
+      "status": "open"
+    },
+    {
+      "type": "sourceDataConflict",
+      "entity": "Claim Line",
+      "attribute": "Procedure_Code",
+      "detail": "2 sample lines carry both CPT4Code and HCPCS Code while Procedure Code Type is 'CPT'; the dictionary says HCPCS is blank when the procedure is CPT.",
+      "status": "open"
+    },
+    {
+      "type": "attributeGap",
+      "entity": "Claim Line",
+      "attribute": "Diagnosis_Code",
+      "detail": "The dictionary has a single Diagnosis_Code; secondary diagnoses are proposed as Diagnosis_Code_2/3. A child Claim Diagnosis entity may be the better canonical design.",
+      "status": "open"
     }
   ],
   "guardrails": [
@@ -5505,6 +6148,42 @@
       "text": "Where details are missing, continue with clearly labelled assumptions and open questions for SMEs; never present an inference as confirmed.",
       "status": "proposed",
       "source": "Healthcare_Payer_Data_Reporting_PI_Enterprise_Instruction_Document.docx §5, §30 Layer 2"
+    },
+    {
+      "id": "PI-G13",
+      "text": "Classify PHI and PII in Privacy Classification. Member name and date of birth are direct identifiers: omit or tokenize them when not required (minimum necessary).",
+      "status": "proposed",
+      "source": "Healthcare_Payer_Data_Reporting_PI_Enterprise_Instruction_Document.docx §24; vendor3_medical_claims_claim_line.xlsx Data Dictionary"
+    },
+    {
+      "id": "PI-G14",
+      "text": "Provider Tax ID is a sensitive identifier: require encryption in transit and at rest.",
+      "status": "proposed",
+      "source": "vendor3_medical_claims_claim_line.xlsx Data Dictionary"
+    },
+    {
+      "id": "PI-G15",
+      "text": "Preserve leading zeros in NPI, ZIP code and place of service code (map as text, never numeric).",
+      "status": "proposed",
+      "source": "vendor3_medical_claims_claim_line.xlsx Data Dictionary"
+    },
+    {
+      "id": "PI-G16",
+      "text": "Billing and servicing providers are two roles on the same Provider entity; map each through its own role, never as separate provider tables.",
+      "status": "proposed",
+      "source": "Healthcare_Payer_Data_Reporting_PI_Enterprise_Instruction_Document.docx Reporting Standards (Billing / Rendering / Servicing Provider)"
+    },
+    {
+      "id": "PI-G17",
+      "text": "For a claim-line file, state the grain (claim + adjustment + line) in the STTM Summary and enforce it as a uniqueness Validation Rule.",
+      "status": "proposed",
+      "source": "vendor3_medical_claims_claim_line.xlsx README"
+    },
+    {
+      "id": "PI-G18",
+      "text": "On a claim-line file (one row per claim line), map line-level dates, amounts and codes to Claim Line (e.g. Paid Date -> Claim Line.Paid_Date), not to Claim Header.",
+      "status": "proposed",
+      "source": "vendor3_medical_claims_claim_line.xlsx Data Dictionary"
     }
   ]
 }

@@ -1,0 +1,28 @@
+{
+  "description": "The clients and projects BA Assist serves -- the single source of truth for the admin Register page, access checks, document folders and ontologies. Ids are stable and lowercase; names are what users see. A project's Blob folder is <clientId>/<projectId>. See ACCESS_AND_PROJECT_MAPPING.md.",
+  "clients": [
+    {
+      "clientId": "excellus",
+      "clientName": "Excellus",
+      "projects": [
+        { "projectId": "payment-integrity", "projectName": "Payment Integrity" },
+        { "projectId": "medical-claims", "projectName": "Medical Claims" },
+        { "projectId": "correspondence-mapping", "projectName": "Correspondence mapping" }
+      ]
+    },
+    {
+      "clientId": "amerihealth",
+      "clientName": "AmeriHealth",
+      "projects": [
+        { "projectId": "req", "projectName": "Req" }
+      ]
+    },
+    {
+      "clientId": "scan",
+      "clientName": "Scan",
+      "projects": [
+        { "projectId": "qnxt-to-edw-mapping", "projectName": "Qnxt to EDW mapping" }
+      ]
+    }
+  ]
+}

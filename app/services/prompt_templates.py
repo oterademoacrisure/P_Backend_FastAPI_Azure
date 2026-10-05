@@ -16,29 +16,53 @@ IN_SCOPE_DOMAINS = (
     "payment integrity for U.S. healthcare payer data"
 )
 
+_AGILE_ROLES = (
+    "Reporting Analyst, Business Analyst, Product Owner, Claims Analyst, Provider "
+    "Analyst, Payment Integrity Analyst, Quality Analyst, Data Steward, Compliance "
+    "Analyst, Finance Analyst, Member Services Representative"
+)
+
 _AGILE_ARTIFACT_INSTRUCTION = (
-    "Generate an Agile Feature artifact as PLAIN TEXT. The KNOWLEDGE BASE CONTEXT "
-    "below includes the organization's Feature template (source: Feature "
-    "Template.docx) -- it is the single source of truth for this format. Reproduce "
-    "its section order, headings, and structure exactly, each preceded by a "
-    "'## <Section Title>' heading line matching the template's own titles: Feature "
-    "Title; Feature Description (persona / want / so-that statements); Business "
-    "Objective; Key Capabilities (numbered KC-N items, each with a lettered "
-    "sub-bullet); Out of Scope; Assumptions; Dependencies (separate 'Business "
-    "Dependencies' and 'Technical Dependencies' bulleted lists); Acceptance "
-    "Criteria (System Must) (numbered AC-N items); Gherkin Acceptance Criteria (one "
-    "or more Scenario blocks written as Given/When/Then prose, not a table); Risks / "
-    "Open Questions (a header row 'ID | Risk / Question', then one '|'-delimited "
-    "row per risk); Feature Outcome (a bulleted list of resulting capabilities). "
-    "Only the Risks / Open Questions section uses '|'-delimited rows -- every other "
-    "section stays plain prose/bullets exactly as in the template, not "
-    "'|'-delimited. Do not add, omit, reorder, or rename any section. If the "
-    "template excerpt is missing from KNOWLEDGE BASE CONTEXT for this run, state "
-    "that in an Open Question instead of guessing at a structure.\n\n"
-    "Never invent capabilities, dependencies, or acceptance criteria not grounded "
-    "in the uploaded source material or knowledge-base context -- where the source "
-    "material doesn't specify something the template requires, label it an "
-    "Assumption or Open Question instead of stating it as fact."
+    "Generate an Agile artifact as PLAIN TEXT: one Feature in the organization's "
+    "Feature template layout (Feature Template.docx), followed by its User Stories "
+    "per the enterprise instruction document's Epic / Feature / Story rules (§22) "
+    "and the User Story template. Write exactly these 13 sections, in this order, "
+    "each preceded by a '## N. <Section Title>' heading line with this exact "
+    "numbering and title -- do not add, omit, reorder, or rename any section:\n"
+    "## 1. Feature Title\n## 2. Feature Description\n## 3. Business Objective\n"
+    "## 4. Key Capabilities\n## 5. Out of Scope\n## 6. Assumptions\n"
+    "## 7. Dependencies\n## 8. Acceptance Criteria (System Must)\n"
+    "## 9. Gherkin Acceptance Criteria\n## 10. Risks / Open Questions\n"
+    "## 11. Feature Outcome\n## 12. User Stories\n## 13. Story Acceptance Criteria\n\n"
+    "Sections 1-9 and 11 are plain prose or '-' bullets, never '|'-delimited:\n"
+    "- 1: one line, 'E1-F1 <feature title>'.\n"
+    "- 2: three lines, 'As a <role>', 'I want <capability>', 'So that <business value>'.\n"
+    "- 3: the objective, then the outcomes it aims for as bullets.\n"
+    "- 4: numbered 'KC-1 <capability name>' items, each followed by a one-line description.\n"
+    "- 7: a 'Business Dependencies' list, then a 'Technical Dependencies' list.\n"
+    "- 8: numbered 'AC-1 <name>' items, each followed by a 'System Must ...' statement.\n"
+    "- 9: one or more 'Scenario N: <name>' blocks as Given / When / Then / And lines.\n"
+    "Sections 10, 12 and 13 are '|'-delimited tables: a header row with exactly the "
+    "columns below, then one row per item.\n"
+    "- 10. Risks / Open Questions: 'ID | Risk / Question', IDs R-001, R-002, ...\n"
+    "- 12. User Stories: 'Story ID | Story Title | As a | I Want | So That | Story "
+    "Points | MoSCoW Priority | Business Rules | Prerequisites | Assumptions | "
+    "Constraints & Dependencies'. Write 3 to 7 stories for the feature, IDs E1-F1-S1, "
+    "E1-F1-S2, .... 'As a' must be one of these roles: " + _AGILE_ROLES + ". Story "
+    "Points is a whole number from 1 to 5; MoSCoW Priority is Must, Should, Could or "
+    "Won't. Separate several items inside one cell with ';', never '|'.\n"
+    "- 13. Story Acceptance Criteria: 'AC ID | Story ID | Scenario Type | Given | When "
+    "| Then', IDs <Story ID>-AC1, <Story ID>-AC2, ... (e.g. E1-F1-S1-AC1). Scenario "
+    "Type is Happy path, Validation or Edge case. Every story has at least one Happy "
+    "path and one Validation row, plus Edge case rows where applicable; cover "
+    "auditability and reporting impact in a Then cell where the story affects them.\n\n"
+    "Do not use markdown tables (no '---' separator rows): one row per line, a single "
+    "'|' between cells, and every row has exactly as many cells as its header -- write "
+    "'N/A' in a cell with no applicable value. Never invent capabilities, "
+    "dependencies, business rules, or acceptance criteria not grounded in the uploaded "
+    "source material or knowledge-base context -- where the material doesn't specify "
+    "something a section needs, label it an Assumption or raise it in Risks / Open "
+    "Questions instead of stating it as fact."
 )
 
 FORMAT_INSTRUCTIONS = {
@@ -46,9 +70,50 @@ FORMAT_INSTRUCTIONS = {
     "agile artifact": _AGILE_ARTIFACT_INSTRUCTION,
     "agile": _AGILE_ARTIFACT_INSTRUCTION,
     "frd": (
-        "Write a formal Functional Requirements Document with sections: "
-        "Introduction, Stakeholders, Functional Requirements (numbered FR-xx), "
-        "Assumptions & Constraints, Open Questions."
+        "Generate a Functional Requirements Document (FRD) as PLAIN TEXT, following the "
+        "enterprise instruction document's FRD standards (§13) and FRD rules (§19). "
+        "Produce a complete first draft even when information is incomplete. Write "
+        "exactly these 17 sections, in this order, each preceded by a '## N. <Section "
+        "Title>' heading line with this exact numbering and title -- do not add, omit, "
+        "reorder, or rename any section:\n"
+        "## 1. Executive Summary\n## 2. Business Objective\n## 3. Current State\n"
+        "## 4. Future State\n## 5. Scope\n## 6. Out of Scope\n## 7. Personas\n"
+        "## 8. Functional Requirements\n## 9. Business Rules\n## 10. Data Requirements\n"
+        "## 11. Reporting Requirements\n## 12. Integration Requirements\n"
+        "## 13. Security Requirements\n## 14. NFRs\n## 15. Assumptions\n## 16. Risks\n"
+        "## 17. Open Questions\n\n"
+        "Sections 8, 9, 10, 16 and 17 are '|'-delimited tables: a header row with "
+        "exactly the columns below, then one row per item. Every other section is "
+        "plain prose or '-' bullets, never '|'-delimited.\n"
+        "- 8. Functional Requirements: 'Requirement ID | Requirement | Source / "
+        "Rationale | Acceptance Criteria'. IDs are FR-001, FR-002, ... (three digits, "
+        "sequential). Each requirement is one clear, measurable, testable 'The system "
+        "shall ...' statement; Acceptance Criteria states how it is verified.\n"
+        "- 9. Business Rules: 'Rule ID | Business Rule | Source / Rationale', IDs "
+        "BR-001, BR-002, ...\n"
+        "- 10. Data Requirements: 'Data Requirement ID | Target Entity | Target Field "
+        "Name | Target Data Type | Requirement | Mapping Confidence | Open Question', "
+        "IDs DR-001, DR-002, .... Target Entity and Target Field Name must be spelled "
+        "exactly as in the CANONICAL ONTOLOGY -- never invent an entity or attribute. "
+        "Mapping Confidence is 'Confirmed', 'Candidate' or 'Needs SME Review', with the "
+        "same meaning as in an STTM; a row that is not 'Confirmed' must spell out its "
+        "question in full in Open Question (otherwise 'N/A'). A data need with no "
+        "matching ontology attribute goes in Open Questions, not in this table.\n"
+        "- 16. Risks: 'Risk ID | Risk | Impact | Mitigation', IDs R-001, R-002, ...\n"
+        "- 17. Open Questions: 'Question ID | Open Question | Related Item', IDs "
+        "Q-001, Q-002, ...; Related Item names the FR/BR/DR/R ID it concerns, or 'N/A'.\n"
+        "Section 14 lists non-functional requirements as '-' bullets numbered NFR-001, "
+        "NFR-002, ..., each measurable. Section 15 lists assumptions as '-' bullets, "
+        "then a line 'Dependencies:' followed by the business and technical "
+        "dependencies as '-' bullets. Section 7 names each persona and what they need "
+        "from the system.\n\n"
+        "Do not use markdown tables (no '---' separator rows): one row per line, a "
+        "single '|' between cells, and every row has exactly as many cells as its "
+        "header -- write 'N/A' in a cell with no applicable value. Never invent source "
+        "systems, fields, volumes, SLAs, or calculations not in the provided material: "
+        "where the material doesn't specify something a section needs, state it as an "
+        "Assumption or Open Question instead of as fact, and if a whole section has no "
+        "grounding, write one line saying so and raise an Open Question for it."
     ),
     "sttm": (
         "Generate a Source-to-Target Mapping (STTM) deliverable as PLAIN TEXT. The "
@@ -132,9 +197,17 @@ def resolve_format_instruction(output_format: str) -> str:
     return FORMAT_INSTRUCTIONS.get(key, "")
 
 
-def build_system_message(knowledge_base_context: str) -> str:
-    """The shared guardrailed system prompt. Identical for every output format --
-    only the user message's "Output requirement" line varies."""
+def build_system_message(knowledge_base_context: str, ontology_context: str = "") -> str:
+    """The shared guardrailed system prompt. Identical for every output format
+    except for `ontology_context` -- the canonical ontology block from
+    app/services/ontology_service.prompt_context(), given only to formats that
+    name target entities/attributes (STTM, FRD) -- and the user message's
+    "Output requirement" line."""
+    ontology_section = (
+        "=== CANONICAL ONTOLOGY (approved target model -- binding) ===\n"
+        f"{ontology_context}\n\n"
+        if ontology_context else ""
+    )
     return (
         "You are an expert PayIntegrity / Healthcare Payer Business Analyst "
         "drafting precise, production-ready specification documents (FRD, STTM, "
@@ -174,6 +247,7 @@ def build_system_message(knowledge_base_context: str) -> str:
         "cell instead of leaving it blank between two pipes or collapsing two pipes "
         "into one; a missing cell shifts every following column in that row into the "
         "wrong field.\n\n"
+        f"{ontology_section}"
         "=== KNOWLEDGE BASE CONTEXT ===\n"
         f"{knowledge_base_context}"
     )

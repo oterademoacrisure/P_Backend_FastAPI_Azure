@@ -25,7 +25,9 @@ Called from app/graph.py's generate_node right after openai_service
 Caveat: the "is this an addition" check is a keyword heuristic (see
 _ADD_KEYWORDS/_REMOVAL_KEYWORDS) -- an edit instruction that happens to
 contain a word like "add" (e.g. "add more detail to the Total_Refund_Amount
-definition") could be mis-split into a restore+append. This is a pragmatic
+definition") used to be mis-split into a restore+append; a changed row that
+still describes the same subject (same Target Field Name, see
+_same_subject) is now kept as an in-place edit. This is a pragmatic
 first-pass safety net, not a full structured-state fix (see the
 architecture discussion around this module's introduction) -- it only
 guards against a genuinely dropped/overwritten row.
@@ -126,6 +128,18 @@ def _next_id(existing_ids: list[str]) -> str:
     return f"{prefix}{max(numbered) + 1:0{width}d}"
 
 
+# Columns that say *what* a row is about, per section: if one of these is
+# unchanged, a changed row is the same record edited, not a different one.
+_SUBJECT_COLUMNS = ("target field name", "statement", "review question", "risk / question")
+
+
+def _same_subject(columns: list[str], prior_row: dict[str, str], new_row: dict[str, str]) -> bool:
+    for col in columns:
+        if col.lower() in _SUBJECT_COLUMNS:
+            return prior_row.get(col, "").strip().lower() == new_row.get(col, "").strip().lower()
+    return False
+
+
 def restore_dropped_rows(prior_draft: str, new_draft: str, instruction: str) -> str:
     """Fixes up `new_draft` so a row present in `prior_draft` is never
     silently overwritten by this turn's addition. See module docstring."""
@@ -187,6 +201,12 @@ def restore_dropped_rows(prior_draft: str, new_draft: str, instruction: str) -> 
             and _looks_like_id_sequence(list(prior_by_key.keys()))
         ):
             for cid in changed_ids:
+                if _same_subject(columns, prior_by_key[cid], new_by_key[cid]):
+                    # Same field, edited in place ("add a validation rule to
+                    # the Units row") -- a legitimate change, not a new row
+                    # that overwrote an old one. Splitting it used to leave
+                    # the edit reverted plus a duplicate row.
+                    continue
                 idx = next(i for i, r in enumerate(result_rows) if r[key_col] == cid)
                 overwritten_row = result_rows[idx]
                 new_id = _next_id(all_ids)

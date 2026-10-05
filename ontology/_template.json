@@ -1,0 +1,84 @@
+{
+  "name": "BA Assist Ontology - <Project name>",
+  "project": "<ProjectID exactly as on the admin Register page, e.g. Correspondence mapping>",
+  "projectFolder": "<clientId>/<projectId> from app/config/projects.json, e.g. excellus/payment-integrity",
+  "version": "0.1.0-draft",
+  "description": "<Project>'s own canonical model for STTM generation. Register the project in app/config/projects.json, then copy this file to ontology/<clientId>/<projectId>.json (local) or upload it as <clientId>/<projectId>/ontology.json in the knowledge-base Blob container. See ontology.md section 'One ontology per project'.",
+  "statusLegend": {
+    "approved": "Approved by this project's SMEs; may be mapped as Confirmed.",
+    "proposed": "Draft; usable, but capped at Candidate until approved."
+  },
+  "sources": [
+    "<this project's data dictionary>",
+    "<this project's instruction document>",
+    "<sample input file>"
+  ],
+  "guardrails": [
+    {
+      "id": "XX-G1",
+      "text": "<one rule from this project's instruction document>",
+      "status": "proposed",
+      "source": "<document> <section>"
+    }
+  ],
+  "entities": [
+    {
+      "name": "<Entity Name>",
+      "domain": "<domain>",
+      "status": "proposed",
+      "attributes": [
+        {
+          "name": "<Attribute_Name>",
+          "definition": "<business definition>",
+          "dataType": "VARCHAR",
+          "length": "50",
+          "primaryKey": false,
+          "nullable": true,
+          "privacy": "Non-sensitive",
+          "status": "proposed"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "<Entity>",
+      "to": "<Entity>",
+      "via": "<FK attribute>",
+      "cardinality": "many-to-one",
+      "status": "proposed"
+    }
+  ],
+  "roles": [],
+  "aliases": [
+    {
+      "target": "<Entity>.<Attribute_Name>",
+      "aliases": [
+        "<vendor column name>"
+      ],
+      "status": "proposed",
+      "observedIn": [
+        "<vendor / file>"
+      ]
+    }
+  ],
+  "valueSets": [
+    {
+      "name": "<Value set>",
+      "status": "proposed",
+      "values": [
+        "<value>"
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "XX-R1",
+      "description": "<what must always be true>",
+      "expression": "<Entity.Attr = ...>",
+      "severity": "error",
+      "status": "proposed"
+    }
+  ],
+  "knownIssues": []
+}

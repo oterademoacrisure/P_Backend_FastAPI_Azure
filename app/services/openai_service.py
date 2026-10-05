@@ -84,6 +84,7 @@ async def generate_document(
     prior_draft: str | None,
     correction_feedback: str,
     deployment: str | None = None,
+    ontology_context: str = "",
 ) -> str:
     """
     Drafts (or revises) one document for the LangGraph pipeline.
@@ -101,9 +102,12 @@ async def generate_document(
       from scratch. correction_feedback is the extra instruction added on
       top when this is specifically an automatic groundedness-retry (see
       prepare_retry_node in app/graph.py) rather than a user-initiated turn.
+    - ontology_context is the canonical ontology block (see
+      app/services/ontology_service.prompt_context), "" for formats that
+      don't use it.
     """
     instruction = resolve_format_instruction(output_format)
-    system_msg = build_system_message(retrieved_context)
+    system_msg = build_system_message(retrieved_context, ontology_context)
 
     latest_instruction = instruction_history[-1]["instruction"] if instruction_history else ""
     prior_turns = instruction_history[:-1]

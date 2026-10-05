@@ -13,9 +13,10 @@ shows where those two slices sit relative to everything else.
 > only as a client of this API's contract (verified from `app/main.py`'s CORS
 > `origins` list and `routergenerator.py`'s docstrings, which name it as an
 > Azure Static Web App). Everything under [1](#1-layers) through
-> [6](#6-deployment--infrastructure) below is verified against this repo's
-> actual code (`app/`, `Dockerfile`, `deploy.ps1`) — nothing here is
-> aspirational.
+> [5](#5-content-safety-in-the-flow) below is verified against this repo's
+> actual code (`app/`, `Dockerfile`). Section 6 describes the Azure resources
+> the old `deploy.ps1` script provisioned; that script has since been removed
+> from the repo.
 
 ## 1. Layers
 
@@ -30,8 +31,9 @@ flowchart TB
         Ingress["ACA ingress<br/>TLS terminate, HTTP routing"]
         subgraph Revision["payeriq-api revision (autoscaled 0..N replicas)"]
             Docker["Docker container<br/>python:3.11-slim, uvicorn, non-root appuser"]
-            API["FastAPI app (app/main.py)<br/>POST /generate  --  /v2/* router"]
+            API["FastAPI app (app/main.py)<br/>/v2/auth, /v2/admin, /v2/* router, legacy POST /generate"]
             Graph["LangGraph StateGraph<br/>app/graph.py (/v2 only)"]
+            Config["Bundled config<br/>app/config/projects.json (project registry)<br/>ontology/&lt;client&gt;/&lt;project&gt;.json, templates/"]
         end
     end
 
@@ -42,12 +44,16 @@ flowchart TB
         CS["Azure AI Content Safety<br/>Prompt Shields + Groundedness"]
         Cosmos1["Cosmos DB -- Checkpoints container<br/>LangGraph session state"]
         Cosmos2["Cosmos DB -- DocumentHistory container<br/>compliance audit log"]
+        Cosmos3["Cosmos DB -- payeriqdb<br/>UserCredential: logins + user/project mappings"]
         Blob2["Azure Blob Storage<br/>archived uploaded files"]
         ACR["Azure Container Registry<br/>payeriqregistry"]
     end
 
     FE -->|"multipart/form-data over HTTPS"| Ingress --> Docker --> API
     API --> Graph
+    API -->|login, project access check| Cosmos3
+    Graph -->|ontology + STTM template,<br/>Blob first, bundled copy as fallback| Config
+    Graph -.->|ontology / template override| Blob1
     API -->|retrieve_grounding| Search
     Search -.indexes.-> Blob1
     API -->|chat completions| AOAI
@@ -62,21 +68,23 @@ flowchart TB
 |---|---|---|
 | Client | ReactJS, hosted on Azure Static Web Apps | Upload UI (project name, instructions, output-format checkboxes, files), consumes streamed NDJSON, renders/downloads the finalized `.xlsx`/`.docx` |
 | Container image | Docker (`python:3.11-slim`) | Single image; `requirements.txt` installed before source copy for layer caching; runs as non-root `appuser`; `CMD uvicorn app.main:app --host 0.0.0.0 --port 8000` |
-| Container runtime | **Azure Container Apps** (not a self-managed Kubernetes cluster — see [note](#a-note-on-kubernetes)) | Hosts the `payeriq-api` revision, handles TLS/ingress/autoscaling; provisioned by [`deploy.ps1`](deploy.ps1) |
+| Container runtime | **Azure Container Apps** (not a self-managed Kubernetes cluster — see [note](#a-note-on-kubernetes)) | Hosts the `payeriq-api` revision, handles TLS/ingress/autoscaling; provisioned with `az containerapp` (the `deploy.ps1` script that did this has been removed from the repo) |
 | API / orchestration | FastAPI (`app/main.py`), LangGraph (`app/graph.py`) | Two coexisting pipelines — `POST /generate` (v1, direct) and `/v2/*` (LangGraph, stateful, streamed) — see [section 3](#3-two-api-pipelines-on-one-app) |
+| Auth & access | `app/auth_router.py`, `app/admin_router.py`, `auth_service.py` | Username/password login (bcrypt) issues an HS256 JWT; every route except `/`, `/health` and `/v2/auth/login` requires it. Generate/refine/status/download check the user is mapped to the client/project (admins exempt) and owns the session. See [ACCESS_AND_PROJECT_MAPPING.md](ACCESS_AND_PROJECT_MAPPING.md) |
+| Project model | `app/config/projects.json`, `ontology/`, `templates/` | The registry of clients/projects (stable ids, Blob folder `<client>/<project>`); one ontology per project (the Payer Data Dictionary plus project extensions, see [ontology.md](ontology.md)); the common STTM Excel template |
 | AI services | Azure OpenAI, Azure AI Search, Azure AI Content Safety | Generation, retrieval grounding, and safety guardrails |
-| Persistence | Cosmos DB (two containers), Azure Blob Storage (two containers) | Session memory, compliance audit log, KB source docs, archived uploads |
-| Registry | Azure Container Registry | Holds built images; `deploy.ps1` builds and pushes via `az acr build` |
+| Persistence | Cosmos DB (two databases), Azure Blob Storage (two containers), container disk | Session memory, compliance audit log, logins and user/project mappings, KB source docs and ontology/template overrides, archived uploads; generated `.xlsx` files on the replica's local disk (see [section 9](#9-known-gaps)) |
+| Registry | Azure Container Registry | Holds built images (`az acr build`) |
 
 ### A note on Kubernetes
 
 Azure Container Apps *is* built on Kubernetes and KEDA under the hood, but
 it's a **managed, serverless** layer on top of that — this repo has no
 Deployment/Service/Ingress YAML, no Helm chart, and no direct `kubectl`
-interaction anywhere in `deploy.ps1` or the codebase. If a separate AKS
+interaction anywhere in the codebase. If a separate AKS
 cluster exists elsewhere in the org's broader estate, it isn't part of what
 this repository provisions or documents; everything below reflects the
-actual `az containerapp` path in [`deploy.ps1`](deploy.ps1).
+`az containerapp` path described in section 6.
 
 ## 2. Request lifecycle, start to finish
 
@@ -85,29 +93,37 @@ sequenceDiagram
     participant FE as React SPA
     participant ACA as Azure Container Apps ingress
     participant API as FastAPI (/v2/generate)
+    participant Auth as Cosmos DB (payeriqdb)
     participant CS as Content Safety
     participant Search as Azure AI Search
     participant AOAI as Azure OpenAI
     participant Cosmos as Cosmos DB (Checkpoints)
 
-    FE->>ACA: POST /v2/generate (multipart: output_format[], instructions, files)
+    FE->>ACA: POST /v2/generate (Bearer JWT; multipart: client_id, project_id, output_format[], instructions, files)
     ACA->>API: routed to a warm or autoscaled-up replica
-    API->>API: extract_and_log() each file -> source_files
+    API->>API: verify JWT, resolve client/project in the registry, validate output_format
+    API->>Auth: is this user mapped to the client/project? (admins skip)
+    Auth-->>API: yes (else 403)
+    API->>API: extract_and_log() each file -> source_files (audit log records the token's user)
     API->>CS: text:shieldPrompt (instruction + document text)
     alt attack_detected
         CS-->>API: attackDetected true
         API-->>FE: ndjson {"type":"result","status":"rejected",...}
     else clean
         CS-->>API: attackDetected false
-        API->>Search: retrieve_grounding (cached 15 min, see README section 7)
+        API->>Search: retrieve_grounding, scoped to root + client + project folders
         Search-->>API: KB context + grounding_sources
-        API->>AOAI: chat completion (system+user msg, per format)
+        API->>AOAI: chat completion (system msg incl. the project ontology for STTM/FRD, per format)
         AOAI-->>API: drafted document text
+        API->>AOAI: corrective re-drafts as needed (malformed rows, ontology violations, contradictions)
         API->>CS: text:detectGroundedness (draft vs. retrieved context)
         CS-->>API: groundedness score
         API->>Cosmos: aput checkpoint (after every node -- see MEMORY.md)
+        API->>API: finalize: STTM fills STTM_Data_Ingestion_Template.xlsx, others get a plain workbook
         API-->>FE: ndjson progress lines, then {"type":"result", outputs: {...}}
     end
+    FE->>API: GET /v2/download/{session_id}?output_format=STTM (owner or admin)
+    API-->>FE: the finished .xlsx
 ```
 
 ## 3. Two API pipelines on one app
@@ -116,6 +132,7 @@ sequenceDiagram
 |---|---|---| 
 | Response shape | One JSON body | Streamed NDJSON (`application/x-ndjson`) |
 | State | None — stateless, one-shot | Persisted per `session_id::format` thread in Cosmos (see [MEMORY.md](MEMORY.md)) |
+| Auth / access | JWT + client/project access check | Same, plus session ownership on refine/status/download |
 | Guardrails | None | Prompt Shields (input) + Groundedness Detection (output) — see [CONTENT_SAFETY.md](CONTENT_SAFETY.md) |
 | Self-correction | None | Deterministic repair (`draft_repair.py`) + optional retry loop |
 | Multi-format handling | Sequential, one completion call per format | Concurrent — each format on its own LangGraph thread |
@@ -132,6 +149,8 @@ the two.
 **Request** (`multipart/form-data`):
 
 ```
+client_id: "excellus"
+project_id: "medical-claims"
 project_name: "Acme Health Plan"
 prompt: "Generate the STTM for the new enrollment feed"
 formats: STTM
@@ -161,12 +180,20 @@ model: (optional, defaults to AZURE_OPENAI_DEPLOYMENT_NAME)
 **Request** (`multipart/form-data`):
 
 ```
+client_id: "excellus"
+project_id: "medical-claims"
 output_format: STTM
 output_format: FRD
 instructions: "Generate the STTM and FRD for the enrollment feed"
 project_name: "Acme Health Plan"
 files: vendor_spec.pdf
 ```
+
+`output_format` accepts `STTM`, `FRD` and `Agile` in any case, plus the
+frontend's `gherkin` (= Agile); anything else is a `400`, and a format sent
+twice runs once. The response maps (`outputs`, `statuses`, `messages`, ...)
+are keyed by the spelling the caller sent; threads, state and downloads use
+the canonical name, so `sttm` on generate and `STTM` on download match.
 
 **Response** — streamed NDJSON, one line at a time:
 
@@ -181,7 +208,7 @@ files: vendor_spec.pdf
 
 ```json
 {"type":"progress","format":"FRD","node":"finalize","message":"Finalizing the FRD document..."}
-{"type":"result","session_id":"3f1c9a2e-...","status":"completed","outputs":{"STTM":"## Source-to-Target Mapping...","FRD":"## Functional Requirements Document..."},"groundedness_score":0.91,"groundedness_scores":{"STTM":0.93,"FRD":0.91},"retry_count":0,"retry_counts":{"STTM":0,"FRD":0},"output_path":"generated_outputs/3f1c9a2e-....xlsx","source_filenames":["vendor_spec.pdf"]}
+{"type":"result","session_id":"3f1c9a2e-...","status":"completed","statuses":{"STTM":"completed","FRD":"completed"},"messages":{"STTM":"","FRD":""},"outputs":{"STTM":"## 1. STTM Summary...","FRD":"## 1. Executive Summary..."},"groundedness_score":0.91,"groundedness_scores":{"STTM":0.93,"FRD":0.91},"retry_count":0,"retry_counts":{"STTM":0,"FRD":0},"output_path":"generated_outputs/3f1c9a2e-....xlsx","source_filenames":["vendor_spec.pdf"]}
 ```
 
 **Rejected by Prompt Shields** — the stream ends early, no `generate`/`groundedness_check` lines ever appear for that format:
@@ -226,7 +253,17 @@ check happens before streaming starts:
 {"status":"completed","session_id":"3f1c9a2e-..."}
 ```
 
-### 4.5 `GET /health`
+### 4.5 Other routes
+
+| Route | Auth | Returns |
+|---|---|---|
+| `POST /v2/auth/login` | none | `{"token", "username", "role", "tenantId", "isAdmin"}` |
+| `GET /v2/auth/me/projects` | JWT | the user's assigned client/projects; `allProjects: true` for admins |
+| `GET /v2/admin/projects`, `POST /v2/admin/users` | admin JWT | the registry for the Register page; save a user/project mapping (creates the login if new) |
+| `GET /v2/ontology?client_id=&project_id=&view=summary` (or `full`, `prompt`) | JWT + project access | the project's ontology |
+| `GET /v2/download/{session_id}?output_format=STTM` | JWT, owner or admin | the finished `.xlsx` (404 once the replica that wrote it is gone) |
+
+### 4.6 `GET /health`
 
 ```json
 {
@@ -284,6 +321,9 @@ either way and does **not** block finalization by default — see
 
 ## 6. Deployment & infrastructure
 
+> `deploy.ps1`, which performed the steps below, has been removed from the
+> repo. The diagram records the resources and the order they were created in.
+
 ```mermaid
 flowchart LR
     Dev["Local .env<br/>secrets"] --> D1["az login check"]
@@ -305,6 +345,10 @@ flowchart LR
   (`payeriq-contentsafety`), and the `payeriq-api` Container App. Cosmos DB,
   Azure AI Search, and Azure OpenAI are **not** provisioned by `deploy.ps1` —
   they're expected to already exist.
+- **Image contents**: `COPY . .` copies the whole repo apart from what
+  `.dockerignore` excludes -- including `ontology/`, `templates/` and
+  `app/config/`, which the app needs, but also sample vendor files, `.docx`
+  references and admin scripts, which it doesn't.
 - **Revisions**: `az containerapp update` creates a new revision on every
   deploy (`activeRevisionsMode: Single`, 100% traffic to latest) — no
   blue/green or canary step today.
@@ -328,9 +372,28 @@ Grouped by what breaks without each:
 | `AZURE_COSMOS_ENDPOINT` / `KEY` | `/v2/*` returns `503` (no checkpointer); `/generate` (v1) unaffected |
 | `CONTENT_SAFETY_ENDPOINT` / `KEY` | `/v2/*` raises immediately — refuses to run ungated rather than skipping guardrails |
 | `AZURE_DOCS_STORAGE_CONNECTION_STRING` | Compliance document-history logging silently disabled (`HISTORY_ENABLED=False`); generation unaffected |
+| `AUTH_JWT_SECRET` | Every protected route answers `503`; login can't issue tokens |
+| `AZURE_COSMOS_AUTH_DATABASE_NAME` / `AZURE_COSMOS_USER_CONTAINER_NAME` | Defaults `payeriqdb` / `UserCredential`; login and project-access checks fail if they don't exist |
+| `ONTOLOGY_STORAGE_CONNECTION_STRING` / `ONTOLOGY_CONTAINER` | Ontologies and the STTM template load from the bundled `ontology/` and `templates/` copies instead of Blob |
 
 ## 8. Cross-references
+
+- [ACCESS_AND_PROJECT_MAPPING.md](ACCESS_AND_PROJECT_MAPPING.md) — login, roles, client/project mapping, document folders.
+- [ontology.md](ontology.md) — the per-project ontologies and how STTM/FRD drafts are checked against them.
+- [DRAFTING_AND_CHECKS.md](DRAFTING_AND_CHECKS.md) — the prompt, the correction loops and the template fill, step by step.
 
 - [MEMORY.md](MEMORY.md) — how `/v2` session state is persisted and resumed across turns, checkpoint-by-checkpoint.
 - [CONTENT_SAFETY.md](CONTENT_SAFETY.md) — Prompt Shields and Groundedness Detection in full detail, including length limits and error surfacing.
 - [README.md](README.md) — the original, most exhaustive reference; this doc is the cross-cutting map, README is the per-topic depth.
+
+## 9. Known gaps
+
+Open design decisions, not yet addressed in code:
+
+| Gap | Where | Effect |
+|---|---|---|
+| Guardrails see a prefix only | `content_safety_service.py` | Prompt Shields scans the first ~9,500 chars of instruction + files; Groundedness scores the first 7,000 chars of the draft. The rest of a large vendor file reaches the model unscanned, and most of a long STTM/FRD is unscored. |
+| Compliance archive keyed by filename only | `document_history_service.py` | Same-named files from different clients share one version history; two concurrent uploads compute the same version and the second blob overwrites the first. |
+| Generated files on local disk | `finalize_node`, `/v2/download` | A restart, scale-to-zero or another replica loses the file; the frontend then builds a plain workbook in the browser. |
+| Legacy `POST /generate` | `app/main.py` | Still mounted, without Prompt Shields or Groundedness. |
+| FRD output | `xlsx_builder.py` | Plain one-sheet-per-section workbook; the instruction document (§13) prefers Word. |

@@ -67,6 +67,7 @@ class TestLoginEndpoint:
             "username": "admin",
             "role": "superuser",
             "tenantId": "default",
+            "isAdmin": True,
         }
 
     def test_bad_credentials_return_401_not_500(self, monkeypatch):

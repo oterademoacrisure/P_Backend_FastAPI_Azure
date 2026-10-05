@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from typing import List, Dict, Any, Optional
+from urllib.parse import unquote, urlparse
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import VectorizableTextQuery
@@ -22,6 +23,13 @@ SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX_NAME", "rag-1788391708053")
 # sends the raw query text to Azure AI Search and lets the same vectorizer
 # embed it server-side -- this service never calls an embedding model itself.
 VECTOR_FIELD = "text_vector"
+
+# The blob's full URL (the indexer's metadata_storage_path), e.g.
+# https://<account>.blob.core.windows.net/sharepoint-docs/payment-integrity/Rules.docx
+# The wizard-built index doesn't include it -- scripts/add_storage_path_to_index.py
+# adds it. retrieve_grounding() uses it to limit a project's grounding to that
+# project's blob folder.
+PATH_FIELD = "storage_path"
 
 MIN_RELEVANCE_SCORE = 0.0  # Hybrid search's fused (RRF) scores aren't 0-1 normalized
                             # like raw cosine similarity; set a real floor here once
@@ -45,7 +53,7 @@ CHUNKS_PER_DOCUMENT = 2
 # request. Overridable via env var for a faster feedback loop in dev.
 GROUNDING_CACHE_TTL_SECONDS = int(os.getenv("GROUNDING_CACHE_TTL_SECONDS", "900"))  # 15 min
 
-_document_list_cache: List[str] | None = None
+_document_list_cache: List[Dict[str, str]] | None = None
 _document_list_cache_at: float = 0.0
 _document_list_cache_lock = asyncio.Lock()
 
@@ -132,9 +140,29 @@ async def search_knowledge_base(
             return []
 
 
-async def list_indexed_documents() -> List[str]:
+def _folder_of(storage_path: str) -> str:
+    """The folder a blob sits in, relative to its container ("" for a file
+    at the container root). Path is https://host/<container>/<folder...>/<file>."""
+    parts = unquote(urlparse(storage_path).path).strip("/").split("/")
+    return "/".join(parts[1:-1]).lower()
+
+
+def documents_for_project(documents: List[Dict[str, str]], folder: str) -> List[Dict[str, str]]:
+    """Documents a project may use: files at the container root (common to
+    every client and project: templates, standards, data dictionary), the
+    client's folder (shared by that client's projects), and the project's
+    own folder. `folder` is project_registry.Project.folder, e.g.
+    "excellus/payment-integrity" -> root, "excellus/", "excellus/payment-integrity/".
+    Another client's folder never matches, even for a project of the same name."""
+    parts = folder.strip("/").lower().split("/")
+    allowed = {""} | {"/".join(parts[: i + 1]) for i in range(len(parts))}
+    return [d for d in documents if _folder_of(d["path"]) in allowed]
+
+
+async def list_indexed_documents() -> List[Dict[str, str]]:
     """
-    Returns the distinct document titles currently present in the index, so callers
+    Returns the distinct documents currently present in the index, each as
+    {"title": file name, "path": full blob URL}, so callers
     can query each document individually and guarantee every document contributes
     at least one chunk (instead of a single blended top-k query, where a strongly
     matching document can crowd the rest out of the results).
@@ -153,28 +181,30 @@ async def list_indexed_documents() -> List[str]:
             results = await client.search(
                 search_text="*",
                 top=1000,
-                select=["title"],
+                select=["title", PATH_FIELD],
             )
 
-            titles: List[str] = []
+            documents: List[Dict[str, str]] = []
             seen = set()
             async for result in results:
-                title = result.get("title")
-                if title and title not in seen:
-                    seen.add(title)
-                    titles.append(title)
+                path = result.get(PATH_FIELD)
+                if path and path not in seen:
+                    seen.add(path)
+                    documents.append({"title": result.get("title") or path, "path": path})
 
-            return titles
+            return documents
 
     except Exception as e:
         logger.warning("Azure AI Search document listing failed: %s", e)
         return []
 
 
-def build_title_filter(title: str) -> str:
-    """OData filter scoping a search_knowledge_base() call to one document's title."""
-    escaped = title.replace("'", "''").replace('"', '\\"')
-    return f"search.ismatch('\"{escaped}\"', 'title')"
+def build_path_filter(path: str) -> str:
+    """OData filter scoping a search_knowledge_base() call to one document,
+    by exact blob path -- unlike a title match, two projects' files with the
+    same name can't bleed into each other."""
+    escaped = path.replace("'", "''")
+    return f"{PATH_FIELD} eq '{escaped}'"
 
 
 def format_chunks(chunks: List[Dict[str, Any]]) -> str:
@@ -189,7 +219,7 @@ def format_chunks(chunks: List[Dict[str, Any]]) -> str:
     return "\n\n".join(lines)
 
 
-async def _list_indexed_documents_cached() -> List[str]:
+async def _list_indexed_documents_cached() -> List[Dict[str, str]]:
     """
     Cached wrapper around list_indexed_documents(). The title list only changes
     when the knowledge base is re-indexed (a rare, manual event), so it's safe
@@ -218,8 +248,19 @@ async def _list_indexed_documents_cached() -> List[str]:
         return documents
 
 
-async def retrieve_grounding(prompt: str, project: str) -> tuple[str, List[str]]:
+async def retrieve_grounding(
+    prompt: str, project: str, folder: Optional[str] = None
+) -> tuple[str, List[str]]:
     """
+    With `folder` (the project's project_registry folder, e.g.
+    "excellus/payment-integrity"), only the container root, the client's
+    folder and the project's folder are searched (documents_for_project) --
+    and if none of them
+    can be found, nothing is returned rather than falling back to the whole
+    index, so one project's documents can never ground another's output.
+    Without it (admin-only sessions created before projects existed), the
+    whole index is searched as before.
+
     Per-document retrieval against the Azure AI Search knowledge base index.
     Queries each indexed document individually so every document contributes at
     least one chunk, rather than a single blended top-k query where a strongly
@@ -237,6 +278,16 @@ async def retrieve_grounding(prompt: str, project: str) -> tuple[str, List[str]]
     """
     documents = await _list_indexed_documents_cached()
     query = f"{project}: {prompt}"
+
+    if folder:
+        documents = documents_for_project(documents, folder)
+        if not documents:
+            logger.warning(
+                "retrieve_grounding: no indexed documents found for folder %r -- "
+                "returning no grounding. Is %r in the index (scripts/add_storage_path_to_index.py)?",
+                folder, PATH_FIELD,
+            )
+            return format_chunks([]), []
 
     if not documents:
         # Search unconfigured/unreachable or index empty -- degrade to a
@@ -257,9 +308,9 @@ async def retrieve_grounding(prompt: str, project: str) -> tuple[str, List[str]]
         search_knowledge_base(
             query=query,
             top_k=CHUNKS_PER_DOCUMENT,
-            filter_expression=build_title_filter(title),
+            filter_expression=build_path_filter(doc["path"]),
         )
-        for title in documents
+        for doc in documents
     ))
     chunks = [c for doc_chunks in per_document_chunks for c in doc_chunks]
     sources = sorted({c["source_document"] for c in chunks})
@@ -273,7 +324,7 @@ async def retrieve_grounding(prompt: str, project: str) -> tuple[str, List[str]]
     # on every call, which this log makes visible too). Flagging it here is
     # what makes a silently incomplete grounding result diagnosable instead of
     # looking identical to "this document just wasn't relevant."
-    missing = sorted(set(documents) - set(sources))
+    missing = sorted({d["title"] for d in documents} - set(sources))
     if missing:
         logger.warning(
             "retrieve_grounding: %d of %d indexed document(s) contributed no "

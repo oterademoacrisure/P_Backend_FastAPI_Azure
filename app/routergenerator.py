@@ -43,14 +43,16 @@ import json
 import logging
 import os
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from azure.cosmos.aio import CosmosClient
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
-from app.auth_router import require_auth
+from app.auth_router import check_project_access, require_auth
 from app.graph import build_graph, PayerIQState, SourceFile
+from app.services import auth_service, ontology_service, project_registry
 from app.services.cosmos_checkpoint import AsyncCosmosDBSaver
 from app.services.file_extraction import extract_and_log
 
@@ -117,10 +119,58 @@ async def _extract_new_files(files: List[UploadFile], uploaded_by: str) -> list[
     return new_files
 
 
+def _resolve_project(client_id: str, project_id: str) -> project_registry.Project:
+    """The registered project, or a 400 naming what was sent -- never a
+    silent generation without the project's documents and ontology."""
+    project = project_registry.resolve(client_id, project_id)
+    if project is None:
+        raise HTTPException(400, f"Unknown client/project {client_id!r} / {project_id!r}.")
+    return project
+
+
+# Every spelling a caller may send for a format, onto the one name the
+# graph, thread ids and finalize_node use. The frontend's checkboxes post
+# 'sttm' / 'frd' / 'gherkin' but its download button asks for 'STTM' -- before
+# this mapping the two landed on different threads, so the download 404'd
+# and finalize_node's "STTM" template branch never ran for a UI request.
+_FORMAT_ALIASES = {
+    "sttm": "STTM",
+    "frd": "FRD",
+    "agile": "Agile",
+    "agile artifact": "Agile",
+    "gherkin": "Agile",
+}
+
+
+def canonical_format(output_format: str) -> str:
+    """'sttm' / 'STTM' -> 'STTM', 'gherkin' -> 'Agile'; 400 for anything else."""
+    canonical = _FORMAT_ALIASES.get((output_format or "").strip().lower())
+    if canonical is None:
+        raise HTTPException(
+            400, f"Unknown output_format {output_format!r}; expected one of: STTM, FRD, Agile."
+        )
+    return canonical
+
+
+def normalize_formats(output_format: list[str]) -> list[str]:
+    """The requested formats, validated, keeping the caller's own spelling
+    (the response's outputs/statuses maps are keyed by it) but dropping a
+    second spelling of a format already requested -- two concurrent runs on
+    one thread would overwrite each other's checkpoints."""
+    seen: set[str] = set()
+    kept = []
+    for fmt in output_format:
+        canonical = canonical_format(fmt)
+        if canonical not in seen:
+            seen.add(canonical)
+            kept.append(fmt)
+    return kept
+
+
 def _thread_id(session_id: str, output_format: str) -> str:
     """One LangGraph thread per (session, format) pair -- see module
     docstring for why formats can't share a thread within a session."""
-    return f"{session_id}::{output_format}"
+    return f"{session_id}::{canonical_format(output_format)}"
 
 
 def _initial_state(
@@ -129,12 +179,18 @@ def _initial_state(
     source_files: list[SourceFile],
     project_name: str,
     instructions: str,
+    client_id: str,
+    project_id: str,
+    owner: str,
 ) -> PayerIQState:
     return {
         "session_id": session_id,
-        "output_format": output_format,
+        "output_format": canonical_format(output_format),
         "source_files": source_files,
         "project_name": project_name,
+        "client_id": client_id,
+        "project_id": project_id,
+        "owner": owner,
         "instruction_history": [],
         "draft_history": [],
         "current_instruction": instructions,
@@ -196,7 +252,7 @@ async def _run_format_stream(graph, fmt: str, graph_input: dict, config: dict):
     async for update in graph.astream(graph_input, config=config, stream_mode="updates"):
         for node_name, node_output in update.items():
             state_acc.update(node_output)
-            message = _stage_message(node_name, node_output, fmt)
+            message = _stage_message(node_name, node_output, canonical_format(fmt))
             if message:
                 yield "progress", _ndjson({
                     "type": "progress",
@@ -256,14 +312,29 @@ async def _run_formats_concurrently(
         raise next(iter(errors.values()))
 
 
+async def _check_session_access(claims: dict, values: dict) -> None:
+    """Only the user who started a session (or an admin) may refine it or
+    read its status, and only while they still have access to its project.
+    Answers 404, same as an unknown session, so a session id can't be probed
+    for existence. Sessions created before ownership was recorded have no
+    owner and are therefore admin-only."""
+    if auth_service.is_admin(claims):
+        return
+    owner = values.get("owner", "")
+    if not owner or owner.lower() != str(claims.get("sub", "")).lower():
+        raise HTTPException(404, "Unknown session")
+    await check_project_access(claims, values.get("client_id", ""), values.get("project_id", ""))
+
+
 @router.post("/generate")
 async def generate(
     output_format: List[str] = Form(...),
     instructions: str = Form(...),
+    client_id: str = Form(...),
+    project_id: str = Form(...),
     project_name: Optional[str] = Form(""),
-    uploaded_by: Optional[str] = Form(None),
     files: List[UploadFile] = File(default=[]),
-    _auth: dict = Depends(require_auth),
+    claims: dict = Depends(require_auth),
 ):
     """First turn for a new project/session. Any uploaded vendor files /
     standards are parsed and kept in session state for this and every
@@ -289,9 +360,14 @@ async def generate(
     The final "result" line carries the exact same fields the old
     single-JSON response did, so a client can ignore every "progress" line
     and just consume the last one for today's behavior."""
+    project = _resolve_project(client_id, project_id)
+    await check_project_access(claims, client_id, project_id)
+    # The session stores the registry's ids, whatever spelling was sent.
+    client_id, project_id = project.client_id, project.project_id
     graph = _require_graph()
     session_id = str(uuid.uuid4())
-    source_files = await _extract_new_files(files, uploaded_by or project_name or "unknown")
+    output_format = normalize_formats(output_format)
+    source_files = await _extract_new_files(files, claims.get("sub") or "unknown")
 
     async def stream():
         outputs: dict[str, str] = {}
@@ -302,7 +378,8 @@ async def generate(
         results: dict[str, dict] = {}
         try:
             make_input = lambda fmt: _initial_state(  # noqa: E731
-                session_id, fmt, source_files, project_name or "", instructions
+                session_id, fmt, source_files, project_name or "", instructions,
+                client_id, project_id, claims.get("sub", ""),
             )
             async for line in _run_formats_concurrently(
                 graph, output_format, make_input, lambda fmt: _thread_id(session_id, fmt), results
@@ -358,9 +435,8 @@ async def refine(
     session_id: str,
     output_format: List[str] = Form(...),
     instructions: str = Form(...),
-    uploaded_by: Optional[str] = Form(None),
     files: List[UploadFile] = File(default=[]),
-    _auth: dict = Depends(require_auth),
+    claims: dict = Depends(require_auth),
 ):
     """Follow-up turn: user wasn't satisfied, gave a new instruction, or
     checked a format that wasn't part of the session yet -- optionally with
@@ -378,8 +454,8 @@ async def refine(
     /v2/generate does -- see that endpoint's docstring for the line shapes.
     The final "result" line carries the same `outputs`-map shape as
     /v2/generate's."""
+    output_format = normalize_formats(output_format)
     graph = _require_graph()
-    new_files = await _extract_new_files(files, uploaded_by or "unknown")
 
     # A format cold-starting this turn has no source_files/project_name of
     # its own yet -- borrow them from whichever requested format already
@@ -392,6 +468,7 @@ async def refine(
     # HTTP 404 rather than an in-stream error line.
     known_source_files: list[SourceFile] | None = None
     known_project_name = ""
+    known_values: dict = {}
     snapshots: dict[str, object] = {}
     for fmt in output_format:
         config = {"configurable": {"thread_id": _thread_id(session_id, fmt)}}
@@ -400,8 +477,13 @@ async def refine(
         if snapshot.values and known_source_files is None:
             known_source_files = snapshot.values.get("source_files", [])
             known_project_name = snapshot.values.get("project_name", "")
+            known_values = snapshot.values
     if known_source_files is None:
         raise HTTPException(404, "Unknown session")
+    await _check_session_access(claims, known_values)
+    # Only now, so a caller who doesn't own the session never gets a file
+    # into the compliance archive.
+    new_files = await _extract_new_files(files, claims.get("sub") or "unknown")
 
     def make_input(fmt: str) -> dict:
         snapshot = snapshots[fmt]
@@ -411,7 +493,9 @@ async def refine(
                 graph_input["source_files"] = snapshot.values.get("source_files", []) + new_files
             return graph_input
         return _initial_state(
-            session_id, fmt, known_source_files + new_files, known_project_name, instructions
+            session_id, fmt, known_source_files + new_files, known_project_name, instructions,
+            known_values.get("client_id", ""), known_values.get("project_id", ""),
+            known_values.get("owner", ""),
         )
 
     async def stream():
@@ -457,8 +541,63 @@ async def refine(
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
 
+@router.get("/ontology")
+async def ontology(
+    client_id: str,
+    project_id: str,
+    view: str = "summary",
+    claims: dict = Depends(require_auth),
+):
+    """A project's own ontology, the one its STTM/FRD generation maps
+    against (see app/services/ontology_service.py). Same client/project
+    access check as /v2/generate. ?view=summary (default) gives source,
+    version and counts by status, ?view=full the whole JSON, ?view=prompt
+    the exact compact block the model receives."""
+    if view not in ("summary", "full", "prompt"):
+        raise HTTPException(400, "view must be one of: summary, full, prompt")
+    project = _resolve_project(client_id, project_id)
+    await check_project_access(claims, client_id, project_id)
+    loaded = await ontology_service.get_ontology(project.folder)
+    if view == "summary":
+        return ontology_service.summary(loaded, project.folder)
+    if loaded is None:
+        raise HTTPException(404, f"Project {project_id!r} has no ontology.")
+    if view == "full":
+        return loaded.raw
+    return {
+        "project": loaded.project,
+        "version": loaded.version,
+        "prompt": ontology_service.prompt_context("STTM", loaded),
+    }
+
+
+@router.get("/download/{session_id}")
+async def download(session_id: str, output_format: str, claims: dict = Depends(require_auth)):
+    """The finished .xlsx for one format of a session -- for STTM, the
+    common STTM_Data_Ingestion_Template.xlsx filled with the generated
+    mapping (see xlsx_builder.fill_template). Same ownership check as
+    /v2/status: only the session's owner or an admin, answered 404 otherwise."""
+    graph = _require_graph()
+    config = {"configurable": {"thread_id": _thread_id(session_id, output_format)}}
+    snapshot = await graph.aget_state(config)
+    if not snapshot.values:
+        raise HTTPException(404, "Unknown session")
+    await _check_session_access(claims, snapshot.values)
+    path = snapshot.values.get("output_path") or ""
+    if not path or not os.path.exists(path):
+        # Files live on this instance's disk; a restart or another replica
+        # won't have them. The draft text is still in the session.
+        raise HTTPException(404, "The file for this document is no longer available; generate it again.")
+    project = "".join(ch if ch.isalnum() else "_" for ch in snapshot.values.get("project_id") or "project")
+    return FileResponse(
+        path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=f"{output_format}_{project}_{datetime.now(timezone.utc):%Y-%m-%d}.xlsx",
+    )
+
+
 @router.get("/status/{session_id}")
-async def status(session_id: str, output_format: str, _auth: dict = Depends(require_auth)):
+async def status(session_id: str, output_format: str, claims: dict = Depends(require_auth)):
     """output_format is required as a query param (?output_format=STTM) --
     each format lives on its own thread, so status is per-format."""
     try:
@@ -467,6 +606,7 @@ async def status(session_id: str, output_format: str, _auth: dict = Depends(requ
         snapshot = await graph.aget_state(config)
         if not snapshot.values:
             raise HTTPException(404, "Unknown session")
+        await _check_session_access(claims, snapshot.values)
         return {"status": snapshot.values.get("status"), "session_id": session_id}
     except HTTPException:
         raise

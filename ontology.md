@@ -18,7 +18,7 @@
 | 1 | **The canonical model has no Payment Integrity entities.** For the Cotiviti file, 6 of 14 columns had nothing to map to, and they're the overpayment-specific ones. | The AI had to invent target tables and fields. The enterprise instruction document forbids exactly that. |
 | 2 | **The AI saw only ~3% of the data dictionary.** Search returns 2 chunks per document, and the dictionary is 64 chunks. | Even existing targets were often missing from the AI's view, so the same file could map differently on each run. |
 
-**What we built.** A **lightweight ontology for each project**. All projects share the same templates (STTM, Feature, User Story), but each has its own vendor columns, mappings and guardrail rules, so each gets **its own** JSON file, never shared. Two exist today: **Medical Claims** ([`ontology/medical-claims.json`](ontology/medical-claims.json)) and **Payment Integrity** ([`ontology/payment-integrity.json`](ontology/payment-integrity.json)). Each holds the full data dictionary plus that project's extension: entities, relationships, provider roles, vendor aliases, allowed values, business rules, and guardrail rules from the instruction document. §5.0 shows the end-to-end architecture. The backend now:
+**What we built.** A **lightweight ontology for each project**. All projects share the same templates (STTM, Feature, User Story), but each has its own vendor columns, mappings and guardrail rules, so each gets **its own** JSON file, never shared. Two exist today: **Medical Claims** ([`ontology/excellus/medical-claims.json`](ontology/excellus/medical-claims.json)) and **Payment Integrity** ([`ontology/excellus/payment-integrity.json`](ontology/excellus/payment-integrity.json)). Each holds the full data dictionary plus that project's extension: entities, relationships, provider roles, vendor aliases, allowed values, business rules, and guardrail rules from the instruction document. §5.0 shows the end-to-end architecture. The backend now:
 
 1. **gives the AI the project's whole ontology** on every STTM and FRD request, instead of search fragments;
 2. **checks every target the AI writes** against the ontology, and sends the draft back for correction if a target is wrong;
@@ -34,7 +34,7 @@
 
 ## The complete cycle, step by step
 
-This section is the walkthrough to present. It follows one request from upload to download, says **who** does each step, and gives the evidence behind it. Example: a user assigned to **Payment Integrity** uploads the Cotiviti overpayment file and ticks **STTM**.
+This section is the walkthrough to present. It follows one request from upload to download, says **who** does each step, and gives the evidence behind it. For the code-level detail (the exact prompt, every check, retry limits, telemetry), see [DRAFTING_AND_CHECKS.md](DRAFTING_AND_CHECKS.md). For how users, roles and client/project assignments decide which documents and ontology are used, see [ACCESS_AND_PROJECT_MAPPING.md](ACCESS_AND_PROJECT_MAPPING.md). Example: a user assigned to **Payment Integrity** uploads the Cotiviti overpayment file and ticks **STTM**.
 
 ### The three kinds of knowledge
 
@@ -75,7 +75,7 @@ flowchart TB
 | ② | **Upload** | User | Uploads the vendor Excel, ticks STTM, types an instruction ("Create STTM for the attached vendor file layout"). The Excel holds the data sheet **and** its Data Dictionary sheet, e.g. *Total Paid Amount: Original amount paid for the claim*. | `RequestForm.jsx` → `POST /v2/generate` |
 | ③ | **Access and safety** | Backend; Azure AI Content Safety | Rejects a user who isn't assigned to the project (403). **Prompt Shields** checks the instruction and the uploaded file for jailbreak / prompt-injection attempts. | `check_project_access`, `input_guardrail_node` |
 | ④a | **Format and rules** | **Azure AI Search** | Hybrid (keyword + vector) search, filtered to the common root plus the project's own folder. Returns the 2 most relevant chunks of each document: the **STTM template** (sections, 22 columns) and the **instruction document's rules**. | `azure_search_service.retrieve_grounding` |
-| ④b | **Target model** | Backend | Loads **this project's** `ontology.json`: Blob `sharepoint-docs/<project>/ontology.json` first, the repo copy if Blob is unavailable. Never another project's. | `ontology_service.get_ontology` |
+| ④b | **Target model** | Backend | Loads **this project's** `ontology.json`: Blob `sharepoint-docs/<client>/<project>/ontology.json` first (e.g. `excellus/payment-integrity/`), the repo copy if Blob is unavailable. Never another project's. | `ontology_service.get_ontology` |
 | ④c | **Source** | Backend | Reads every sheet of the uploaded Excel: column names, sample rows, and the vendor's Data Dictionary descriptions. | `file_extraction.extract_text` |
 | ⑤ | **Draft** | **Azure OpenAI (gpt-4.1-mini)**, orchestrated by LangGraph | One prompt combines everything. **System message:** the guardrails, the whole project ontology (target fields, aliases, relationships, rules, project guardrails), and the search results. **User message:** the instruction, the full vendor file, and the STTM format rules. The model writes all four sections: Summary, Mapping, Assumptions and Open Questions, SME Checklist. | `graph.generate_node` → `openai_service.generate_document` |
 | ⑥ | **Check in code** | Backend (deterministic, no AI) | Every row is checked; any problem goes back to the model with a specific correction, then is re-checked (details below). | `draft_repair.py`, `ontology_service.find_violations`, `find_unmapped_source_columns` |
@@ -143,9 +143,9 @@ The Payer Data Dictionary stays the official source; the JSON is its machine-rea
 |---|---|---|
 | 1 | **Stop retrieving the Payer Data Dictionary through search** | Today search still returns 2 chunks of it on every request, though the ontology already holds it complete. Excluding it saves prompt space and removes a second, partial copy. |
 | 2 | **Shared `ontology-core.json` + small project files** | About 90% of each project file is the same copied dictionary |
-| 3 | **Project folders in Blob** (`payment-integrity/`, `medical-claims/`) with each `ontology.json` | Today everything sits at the root and ontologies load from the repo copy |
+| 3 | **Project folders in Blob** (`excellus/payment-integrity/`, `excellus/medical-claims/`) with each `ontology.json` | Today everything sits at the root and ontologies load from the repo copy |
 | 4 | **Indexer schedule and deletion detection** | New Blob files are only searchable after a manual run; deleted ones leave stale chunks |
-| 5 | **FRD (17 sections, instruction doc §19) and Agile (User Story template, §22)** | Next after STTM |
+| 5 | **FRD Word template (instruction doc §13 prefers Word)** | The FRD prompt now produces the 17 §19 sections with ontology-checked Data Requirements, and the Agile prompt adds §22 user stories to the Feature template; both still export as a plain workbook |
 
 ---
 
@@ -350,8 +350,8 @@ If one shared file held both, a Medical Claims STTM could be "validated" against
 ```
 sharepoint-docs/
 ├── ontology-core.json                ← enterprise dictionary, once (31 entities, 326 attributes)
-├── medical-claims/ontology.json      ← only Medical's 16 fields, 36 aliases, 6 rules, 12 guardrails
-└── payment-integrity/ontology.json   ← only PI's 44 fields, 14 aliases, 5 rules, 12 guardrails
+├── excellus/medical-claims/ontology.json      ← only Medical's 16 fields, 36 aliases, 6 rules, 12 guardrails
+└── excellus/payment-integrity/ontology.json   ← only PI's 44 fields, 14 aliases, 5 rules, 12 guardrails
 ```
 
 The backend would merge core + project file at request time, so the AI and the checks see exactly what they see today. **Recommended as the next step**: it doesn't change behaviour, it only removes the duplication.
@@ -373,8 +373,8 @@ flowchart TB
     subgraph Blob["Azure Blob Storage · container sharepoint-docs"]
         direction TB
         ROOT["<b>Container root: common to every project</b><br/>STTM_Data_Ingestion_Template.xlsx<br/>Feature Template.docx · User Story Template.docx<br/>Instruction document · Payer Data Dictionary<br/>Data Mapping Standards"]
-        P1["<b>medical-claims/</b><br/>ontology.json<br/>project documents (optional)"]
-        P2["<b>payment-integrity/</b><br/>ontology.json<br/>project documents (optional)"]
+        P1["<b>excellus/medical-claims/</b><br/>ontology.json<br/>project documents (optional)"]
+        P2["<b>excellus/payment-integrity/</b><br/>ontology.json<br/>project documents (optional)"]
         PN["<b>&lt;next-project&gt;/</b><br/>ontology.json …"]
     end
     IX[("Azure AI Search index<br/>chunks + vectors + storage_path")]
@@ -386,8 +386,8 @@ flowchart TB
 | Where | What lives there | How the backend reads it |
 |---|---|---|
 | **Container root** | The common templates and enterprise documents | **Azure AI Search**: hybrid keyword + vector search, filtered to the root plus the user's project folder |
-| **`<project-folder>/ontology.json`** | That project's target model: entities, attributes, aliases, value sets, rules, guardrails | **Read whole** by `ontology_service` (Blob first; repo `ontology/` copy as fallback) |
-| **`<project-folder>/` other files** | Any project-only documents | **Azure AI Search**, visible only to that project |
+| **`<client>/<project>/ontology.json`** | That project's target model: entities, attributes, aliases, value sets, rules, guardrails | **Read whole** by `ontology_service` (Blob first; repo `ontology/` copy as fallback) |
+| **`<client>/<project>/` other files** | Any project-only documents | **Azure AI Search**, visible only to that project |
 | **The upload** | The vendor file the user attaches | Parsed per request and given to the AI in full |
 
 #### One request, end to end
@@ -642,7 +642,7 @@ The target is real, the type is correct, and the confidence is honest. The SME's
 
 ## 8. Ontology content (DRAFT Payment Integrity extension, needs SME approval)
 
-> **Machine-readable version:** [`ontology/payment-integrity.json`](ontology/payment-integrity.json) holds all of this plus the full existing dictionary and the 12 project guardrails (PI-G1 to PI-G12) taken from the instruction document.
+> **Machine-readable version:** [`ontology/excellus/payment-integrity.json`](ontology/excellus/payment-integrity.json) holds all of this plus the full existing dictionary and the 12 project guardrails (PI-G1 to PI-G12) taken from the instruction document.
 > ⚠️ Everything in this section is a **proposal**, worked out from `Input.xlsx` and the instruction document's "PI Canonical Entity" guidance. Until SMEs approve it, the pipeline caps it at "Candidate".
 
 ### 8.1 New Payment Integrity entities
@@ -778,9 +778,9 @@ flowchart LR
 
 - **Proposed items are usable straight away**, but they're capped at "Candidate", so nothing unapproved is presented as final.
 - **Approval is a one-word change** (`proposed` → `approved`) with no code change, made in that project's file only.
-- **Audit trail:** keep the approved copy of each project's file in the repo (`ontology/<project-folder>.json`) and change it through pull requests, then upload that file to Blob. Git then records who approved what.
+- **Audit trail:** keep the approved copy of each project's file in the repo (`ontology/<client>/<project>.json`) and change it through pull requests, then upload that file to Blob. Git then records who approved what.
 - **Inspect what's live:** `GET /v2/ontology?client_id=…&project_id=…` returns where that project's ontology was loaded from, its version and counts by status. `&view=full` gives the JSON, and `&view=prompt` the exact text the AI receives.
-- **New project:** copy `ontology/_template.json`, fill it from the project's own data dictionary, instruction document (guardrails) and a sample vendor file, mark everything `proposed`, and upload it as `<project-folder>/ontology.json`.
+- **New project:** copy `ontology/_template.json`, fill it from the project's own data dictionary, instruction document (guardrails) and a sample vendor file, mark everything `proposed`, register the project in `app/config/projects.json`, and upload the file as `<client>/<project>/ontology.json` (see ACCESS_AND_PROJECT_MAPPING.md §6).
 
 ### Implementation plan and status
 
@@ -838,7 +838,7 @@ flowchart LR
 
 | File | Role |
 |---|---|
-| Blob `<project-folder>/ontology.json` | Each project's live ontology (container `ONTOLOGY_CONTAINER`, default `sharepoint-docs`) |
+| Blob `<client>/<project>/ontology.json` | Each project's live ontology (container `ONTOLOGY_CONTAINER`, default `sharepoint-docs`) |
 | [`ontology/`](ontology/) | Local copies: `medical-claims.json`, `payment-integrity.json`, and `_template.json` for new projects (override with `ONTOLOGY_DIR`) |
 | [`app/services/ontology_service.py`](app/services/ontology_service.py) | Load, render the prompt block, validate, enforce, grounding excerpt, summary |
 | [`app/services/prompt_templates.py`](app/services/prompt_templates.py) | Adds the `CANONICAL ONTOLOGY` section to the system message |

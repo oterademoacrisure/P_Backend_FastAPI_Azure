@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -33,6 +34,8 @@ import jwt
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos import exceptions
 from dotenv import load_dotenv
+
+from app.services import project_registry
 
 # Defensive, not redundant: app/main.py also calls load_dotenv(), but only
 # after importing app.auth_router -> app.services.auth_service (this
@@ -167,6 +170,201 @@ async def login(username: str, password: str) -> LoginResult:
         username=user["username"],
         role=user.get("role", "user"),
         tenant_id=user.get("tenantId", "default"),
+    )
+
+
+class MappingExistsError(Exception):
+    """Raised by save_user_mapping() when the same UserName is already mapped
+    to the same ClientID/ProjectID -- the admin router maps this to a 409."""
+
+
+# The Register user page only creates ordinary users -- admin is a fixed
+# account set up directly in Cosmos DB, so no one can be made an admin
+# through the API.
+ALLOWED_ROLES = {"user"}
+
+# Where the admin "Register user" page's mappings are stored. Defaults to the
+# UserCredential container, alongside the login documents -- mapping
+# documents are told apart by their "type" field and never carry a
+# "username" field, so _get_user_by_username() can't match one.
+MAPPING_CONTAINER_NAME = os.getenv("AZURE_COSMOS_USER_MAPPING_CONTAINER_NAME", AUTH_CONTAINER_NAME)
+
+
+def _mapping_container(client: CosmosClient):
+    return client.get_database_client(AUTH_DATABASE_NAME).get_container_client(MAPPING_CONTAINER_NAME)
+
+
+async def _get_mapping(user_name: str, client_id: str, project_id: str) -> dict | None:
+    """The user's existing mapping to the same registered project, however
+    it was spelled when saved -- a mapping stored as "Payment Integrity"
+    before the registry existed is the same project as "payment-integrity"."""
+    target = project_registry.resolve(client_id, project_id)
+    async with CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY) as client:
+        query = "SELECT * FROM c WHERE c.type = 'userMapping' AND LOWER(c.UserName) = LOWER(@u)"
+        parameters = [{"name": "@u", "value": user_name}]
+        async for item in _mapping_container(client).query_items(query=query, parameters=parameters):
+            if target and project_registry.resolve(item.get("ClientID"), item.get("ProjectID")) == target:
+                return item
+        return None
+
+
+async def _insert_mapping(mapping: dict) -> None:
+    async with CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY) as client:
+        await _mapping_container(client).create_item(mapping)
+
+
+MIN_PASSWORD_LENGTH = 8
+
+
+def _hash_password(password: str) -> str:
+    # Same bcrypt settings as generatepwd.py, and what login() verifies against.
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+
+async def _create_login(user: dict) -> None:
+    """create_item, not upsert_item, so a race with another registration of
+    the same username can't silently overwrite that account."""
+    async with CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY) as client:
+        container = client.get_database_client(AUTH_DATABASE_NAME).get_container_client(AUTH_CONTAINER_NAME)
+        await container.create_item(user)
+
+
+async def save_user_mapping(
+    *,
+    user_name: str,
+    role: str,
+    client_id: str,
+    project_id: str,
+    created_by: str,
+    password: str = "",
+) -> dict:
+    """Saves one UserName -> Role/ClientID/ProjectID mapping. A user can be
+    mapped to several client/project pairs, but the same pair only once.
+
+    Also manages the login the admin hands to the user:
+      - UserName has no login yet: `password` is required, and a login is
+        created (same document shape as generatepwd.py) with `role`.
+      - UserName already has a login: `password` must be blank -- there is
+        deliberately no way to change an existing password from here. The
+        login (password and role) is left unchanged.
+    The password itself is only ever stored as a bcrypt hash on the login
+    document, never on the mapping."""
+    if not (COSMOS_ENDPOINT and COSMOS_KEY):
+        raise RuntimeError("AZURE_COSMOS_ENDPOINT / AZURE_COSMOS_KEY are not set.")
+
+    if not (user_name and client_id and project_id):
+        raise ValueError("UserName, ClientID and ProjectID are required.")
+    project = project_registry.resolve(client_id, project_id)
+    if project is None:
+        raise ValueError(
+            f"Unknown client/project {client_id!r} / {project_id!r}. "
+            "Add it to app/config/projects.json first."
+        )
+    # Always store the registry's ids, whatever spelling was sent.
+    client_id, project_id = project.client_id, project.project_id
+    if role.lower() not in ALLOWED_ROLES:
+        raise ValueError("Role must be User -- admin accounts can't be created here.")
+    if password and len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+
+    if await _get_mapping(user_name, client_id, project_id) is not None:
+        raise MappingExistsError(
+            f'"{user_name}" is already mapped to {client_id} / {project_id}.'
+        )
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    login = await _get_user_by_username(user_name)
+    if login is None:
+        if not password:
+            raise ValueError(f'"{user_name}" has no login yet -- enter a password to create one.')
+        try:
+            await _create_login({
+                "id": user_name,
+                "username": user_name,
+                "passwordHash": _hash_password(password),
+                "role": role.lower(),
+                "tenantId": "default",
+                "createdAt": now,
+                "createdBy": created_by,
+                "lastLogin": None,
+                "isActive": True,
+            })
+        except exceptions.CosmosResourceExistsError:
+            raise MappingExistsError(f'A login for "{user_name}" was just created by someone else -- try again.')
+        login_action = "created"
+    elif password:
+        raise ValueError(
+            f'"{user_name}" already has a login and its password cannot be changed here -- '
+            "leave Password blank to just add this project."
+        )
+    else:
+        login_action = "unchanged"
+
+    mapping = {
+        "id": str(uuid.uuid4()),
+        "type": "userMapping",
+        "UserName": user_name,
+        "Role": role,
+        "ClientID": client_id,
+        "ProjectID": project_id,
+        "createdAt": now,
+        "createdBy": created_by,
+    }
+    await _insert_mapping(mapping)
+    return {**mapping, "login": login_action}
+
+
+async def get_user_mappings(username: str) -> list[dict]:
+    """Every client/project an admin has mapped this login username to on
+    the "Register user" page. Case-insensitive on UserName, since the admin
+    types it by hand."""
+    if not (COSMOS_ENDPOINT and COSMOS_KEY):
+        raise RuntimeError("AZURE_COSMOS_ENDPOINT / AZURE_COSMOS_KEY are not set.")
+    async with CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY) as client:
+        query = (
+            "SELECT c.ClientID, c.ProjectID, c.Role FROM c "
+            "WHERE c.type = 'userMapping' AND LOWER(c.UserName) = LOWER(@u)"
+        )
+        parameters = [{"name": "@u", "value": username}]
+        return [
+            item
+            async for item in _mapping_container(client).query_items(query=query, parameters=parameters)
+        ]
+
+
+# Login roles that get admin rights (the Register user page, every
+# project). Existing admin accounts were created with role "superuser", new
+# ones from the Register page get "admin". Comma-separated, case-insensitive.
+ADMIN_ROLES = {
+    r.strip().lower()
+    for r in os.getenv("AUTH_ADMIN_ROLES", "admin,superuser").split(",")
+    if r.strip()
+}
+
+
+def is_admin_role(role: str) -> bool:
+    return str(role or "").strip().lower() in ADMIN_ROLES
+
+
+def is_admin(claims: dict) -> bool:
+    return is_admin_role(claims.get("role", ""))
+
+
+async def has_project_access(claims: dict, client_id: str, project_id: str) -> bool:
+    """Admins can use every registered project; anyone else only the
+    client/project pairs they've been mapped to. Both sides are resolved
+    through project_registry, so a mapping saved with display names
+    ("Excellus" / "Payment Integrity") matches a request sent with ids
+    ("excellus" / "payment-integrity") -- and an unregistered project is
+    never accessible, not even to an admin."""
+    requested = project_registry.resolve(client_id, project_id)
+    if requested is None:
+        return False
+    if is_admin(claims):
+        return True
+    mappings = await get_user_mappings(claims.get("sub", ""))
+    return any(
+        project_registry.resolve(m.get("ClientID"), m.get("ProjectID")) == requested for m in mappings
     )
 
 

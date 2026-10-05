@@ -1,11 +1,13 @@
+import os
 from typing import List, Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.auth_router import require_auth
+from app.auth_router import check_project_access, require_auth
 from app.auth_router import router as auth_router
+from app.admin_router import router as admin_router
 from app.config.model_config import (
     DEFAULT_DEPLOYMENT,
     FALLBACK_DEPLOYMENT,
@@ -14,9 +16,11 @@ from app.config.model_config import (
 )
 from app.routergenerator import (
     init_graph_resources,
+    normalize_formats,
     router as graph_router,
     shutdown_graph_resources,
 )
+from app.services import ontology_service, project_registry
 from app.services.azure_search_service import retrieve_grounding
 from app.services.file_extraction import extract_and_log
 from app.services.openai_service import client, create_completion_with_failover
@@ -47,6 +51,7 @@ origins = [
     "http://localhost:8000",
     "http://localhost:3000",
     "http://localhost:5173",  # Vite's default dev server port -- the frontend actually runs here locally
+    "http://localhost:5174",  # Vite's next port when 5173 is already taken
 ]
 
 app.add_middleware(
@@ -71,6 +76,12 @@ async def _startup():
     # one makes a live connection and belongs in the async startup hook, not
     # at import time.
     await init_graph_resources()
+    # Load the project registry now so a clashing entry fails startup, and
+    # report projects with no local ontology copy (Blob may still have one)
+    # instead of discovering it from a silently weaker STTM.
+    for p in project_registry.all_projects():
+        if not os.path.exists(os.path.join(ontology_service.ONTOLOGY_DIR, f"{p.folder}.json")):
+            print(f"Info: project {p.client_name} / {p.project_name} ({p.folder}) has no local ontology file.")
 
 
 @app.on_event("shutdown")
@@ -80,6 +91,7 @@ async def _shutdown():
 
 app.include_router(graph_router, prefix="/v2")
 app.include_router(auth_router, prefix="/v2/auth")
+app.include_router(admin_router, prefix="/v2/admin")
 
 
 @app.get("/")
@@ -115,13 +127,14 @@ async def health_check():
 
 @app.post("/generate")
 async def generate(
+    client_id: str = Form(...),
+    project_id: str = Form(...),
     project_name: Optional[str] = Form(""),
     prompt: str = Form(...),
     formats: List[str] = Form(...),
     files: List[UploadFile] = File(default=[]),
     model: Optional[str] = Form(None),
-    uploaded_by: Optional[str] = Form(None),
-    _auth: dict = Depends(require_auth),
+    claims: dict = Depends(require_auth),
 ):
     """Processes uploaded source files and sends prompts to Azure OpenAI to return formatted analysis documents.
 
@@ -129,7 +142,13 @@ async def generate(
     accept requests with no auth at all. It still does not run Prompt
     Shields or Groundedness (see /v2/generate for that); this fix closes the
     auth gap only, not the guardrail gap, per the scope agreed with the
-    caller of this change."""
+    caller of this change. Same client/project access check as /v2/generate,
+    so this older route can't be used to get around it."""
+    registered = project_registry.resolve(client_id, project_id)
+    if registered is None:
+        raise HTTPException(status_code=400, detail=f"Unknown client/project {client_id!r} / {project_id!r}.")
+    await check_project_access(claims, client_id, project_id)
+    formats = normalize_formats(formats)
     try:
         try:
             requested_deployment = resolve_deployment(model)
@@ -138,7 +157,7 @@ async def generate(
 
         extracted_texts = []
         for f in files:
-            extracted = await extract_and_log(f, uploaded_by or project_name or "unknown")
+            extracted = await extract_and_log(f, claims.get("sub") or "unknown")
             if extracted:
                 filename, text = extracted
                 extracted_texts.append(f"--- {filename} ---\n{text}")
@@ -148,13 +167,16 @@ async def generate(
 
         # Pull enterprise knowledge base grounding from Azure AI Search
         knowledge_base_context, grounding_sources = await retrieve_grounding(
-            prompt, project
+            prompt, project, folder=registered.folder
         )
 
-        system_msg = build_system_message(knowledge_base_context)
+        ontology = await ontology_service.get_ontology(registered.folder)
 
         outputs = {}
         for fmt in formats:
+            system_msg = build_system_message(
+                knowledge_base_context, ontology_service.prompt_context(fmt, ontology)
+            )
             instruction = resolve_format_instruction(fmt)
             user_msg = build_user_message(project, prompt, source_text, instruction)
             resp = await create_completion_with_failover(

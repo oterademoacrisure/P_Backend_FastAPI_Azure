@@ -19,7 +19,7 @@ import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
-from app.services import auth_service
+from app.services import auth_service, project_registry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,6 +51,10 @@ async def login(payload: LoginRequest):
         "username": result.username,
         "role": result.role,
         "tenantId": result.tenant_id,
+        # The frontend shows the Admin button / Register page from this rather
+        # than comparing role itself, so which roles count as admin is decided
+        # in one place (auth_service.ADMIN_ROLES).
+        "isAdmin": auth_service.is_admin_role(result.role),
     }
 
 
@@ -78,4 +82,55 @@ async def require_auth(authorization: str | None = Header(default=None)) -> dict
         )
 
 
-__all__ = ["router", "require_auth"]
+async def require_admin(claims: dict = Depends(require_auth)) -> dict:
+    """require_auth() plus a role check -- the frontend only hides the admin
+    page for non-admins, so this is what actually stops a regular user's
+    token from calling an admin endpoint directly."""
+    if not auth_service.is_admin(claims):
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return claims
+
+
+async def check_project_access(claims: dict, client_id: str, project_id: str) -> None:
+    """Raises 403 unless the caller is an admin or has been mapped to this
+    client/project on the admin "Register user" page. Looked up on every
+    call rather than baked into the token, so adding or removing a mapping
+    takes effect immediately."""
+    try:
+        allowed = await auth_service.has_project_access(claims, client_id, project_id)
+    except RuntimeError as e:
+        logger.error("Project access check is misconfigured: %s", e)
+        raise HTTPException(status_code=503, detail="Project access check is not available.")
+    if not allowed:
+        raise HTTPException(
+            status_code=403,
+            detail=f"You don't have access to {client_id} / {project_id}. Ask an admin to assign it to you.",
+        )
+
+
+@router.get("/me/projects")
+async def my_projects(claims: dict = Depends(require_auth)):
+    """The client/project pairs assigned to the logged-in user on the admin
+    "Register user" page. The main page sends the first one with every
+    generate call (no project picker there). allProjects is true for
+    admins, whom check_project_access lets use any project."""
+    try:
+        mappings = await auth_service.get_user_mappings(claims.get("sub", ""))
+    except RuntimeError as e:
+        logger.error("Project lookup is misconfigured: %s", e)
+        raise HTTPException(status_code=503, detail="Project lookup is not available.")
+    # Resolved through the registry: the frontend gets stable ids to send
+    # back plus display names to show, whichever spelling the mapping was
+    # saved with. A mapping to a project no longer in the registry is left
+    # out rather than offered and then refused.
+    projects = []
+    for m in mappings:
+        project = project_registry.resolve(m.get("ClientID"), m.get("ProjectID"))
+        if project is None:
+            logger.warning("Mapping %s / %s for %s is not in the project registry", m.get("ClientID"), m.get("ProjectID"), claims.get("sub"))
+        elif project.as_dict() not in projects:
+            projects.append(project.as_dict())
+    return {"allProjects": auth_service.is_admin(claims), "projects": projects}
+
+
+__all__ = ["router", "require_auth", "require_admin", "check_project_access"]

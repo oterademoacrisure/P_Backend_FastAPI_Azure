@@ -6,6 +6,7 @@ Wires into the service layer:
 - app.services.azure_search_service     (retrieval)
 - app.services.openai_service           (generation)
 - app.services.content_safety_service   (guardrails: Prompt Shields + Groundedness)
+- app.services.ontology_service         (canonical target model: prompt block + STTM validation)
 - app.xlsx_builder                      (final output assembly)
 
 Mounted via app/routergenerator.py, included from app/main.py under /v2.
@@ -22,7 +23,10 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph, START, END
 
 from app import xlsx_builder
-from app.services import azure_search_service, content_safety_service, draft_repair, openai_service, telemetry
+from app.services import (
+    azure_search_service, content_safety_service, draft_repair, ontology_service, openai_service,
+    project_registry, telemetry, template_service,
+)
 from app.services.openai_service import is_content_filter_error
 
 # A retry no longer gates whether a low-scoring draft reaches the customer
@@ -55,6 +59,13 @@ MAX_MALFORMED_ROW_RETRIES = 3
 # MAX_MALFORMED_ROW_RETRIES does for column-shifted rows.
 MAX_CONFIDENCE_CONTRADICTION_RETRIES = 3
 
+# How many times generate_node will ask the model to fix STTM targets that
+# disagree with the canonical ontology (see ontology_service.find_violations).
+# Fewer than the loops above: ontology_service.enforce_confidence() already
+# guarantees the part that matters most (confidence caps) in code afterwards,
+# so these retries only buy correct names/types.
+MAX_ONTOLOGY_RETRIES = 2
+
 
 class DraftAttempt(TypedDict):
     draft: str
@@ -76,6 +87,12 @@ class PayerIQState(TypedDict):
     # instead of the earlier one" has both files to compare.
     source_files: list[SourceFile]
     project_name: str
+    # Which admin-assigned client/project this session belongs to and which
+    # login username started it -- checked by /v2/refine and /v2/status so
+    # one user can't continue or read another user's session by its id.
+    client_id: str
+    project_id: str
+    owner: str
 
     instruction_history: list[dict]   # [{instruction, timestamp}], one per turn
     draft_history: list[DraftAttempt]  # one per generation attempt, across all turns
@@ -164,10 +181,29 @@ def merge_history_node(state: PayerIQState) -> dict:
     }
 
 
+def _project_folder(state: PayerIQState) -> str | None:
+    """The session's client/project folder from the registry, e.g.
+    "excellus/payment-integrity" (sessions saved before the registry hold
+    display names, which still resolve)."""
+    project = project_registry.resolve(state.get("client_id"), state.get("project_id"))
+    return project.folder if project else None
+
+
 async def retrieve_node(state: PayerIQState) -> dict:
+    folder = _project_folder(state)
+    if state.get("project_id") and folder is None:
+        # A project that no longer resolves (removed from the registry):
+        # no grounding at all, never a search across every client's files.
+        telemetry.track_event("project_unresolved", {
+            "session_id": state.get("session_id", ""),
+            "client_id": state.get("client_id", ""),
+            "project_id": state.get("project_id", ""),
+        })
+        return {"retrieved_context": azure_search_service.format_chunks([]), "grounding_sources": []}
     context, sources = await azure_search_service.retrieve_grounding(
         prompt=state["current_instruction"],
         project=state.get("project_name") or "Untitled Project",
+        folder=folder,
     )
     return {"retrieved_context": context, "grounding_sources": sources}
 
@@ -176,12 +212,19 @@ async def generate_node(state: PayerIQState) -> dict:
     prior_draft = (
         state["draft_history"][-1]["draft"] if state.get("draft_history") else None
     )
+    # This session's project's own ontology (none for a project without one).
+    # Looked up per call rather than kept in PayerIQState -- it's the same
+    # ~36k-char block every turn, and state is checkpointed to Cosmos DB
+    # after every node.
+    ontology = await ontology_service.get_ontology(_project_folder(state))
+    ontology_context = ontology_service.prompt_context(state["output_format"], ontology)
     try:
         draft = await openai_service.generate_document(
             output_format=state["output_format"],
             instruction_history=state["instruction_history"],
             retrieved_context=state["retrieved_context"],
             source_files=state.get("source_files", []),
+            ontology_context=ontology_context,
             prior_draft=prior_draft,
             correction_feedback=state.get("feedback", ""),
         )
@@ -212,6 +255,7 @@ async def generate_node(state: PayerIQState) -> dict:
                     instruction_history=state["instruction_history"],
                     retrieved_context=state["retrieved_context"],
                     source_files=state.get("source_files", []),
+                    ontology_context=ontology_context,
                     prior_draft=prior_draft,
                     correction_feedback=(
                         "Your previous revision did not actually add the new field/row "
@@ -252,6 +296,7 @@ async def generate_node(state: PayerIQState) -> dict:
                 instruction_history=state["instruction_history"],
                 retrieved_context=state["retrieved_context"],
                 source_files=state.get("source_files", []),
+                ontology_context=ontology_context,
                 prior_draft=draft,
                 correction_feedback=(
                     "One or more rows in your previous output had the wrong number of "
@@ -287,6 +332,67 @@ async def generate_node(state: PayerIQState) -> dict:
             "attempts": malformed_attempts,
         })
 
+    ontology_attempts = 0
+    if ontology_context:
+        draft = ontology_service.strip_status_tags(draft)
+    violations = ontology_service.find_violations(draft, ontology) if ontology_context else []
+    # Coverage only on a session's first draft: on a refine turn the analyst
+    # may have asked to drop a column on purpose. STTM only -- an FRD's Data
+    # Requirements table has the same target columns but no Source Field, so
+    # every vendor column would look unmapped.
+    check_coverage = not prior_draft and state["output_format"] == "STTM"
+    unmapped = (
+        ontology_service.find_unmapped_source_columns(draft, state.get("source_files", []))
+        if check_coverage else []
+    )
+    while (violations or unmapped) and ontology_attempts < MAX_ONTOLOGY_RETRIES:
+        # A target the canonical ontology doesn't have (usually a
+        # misspelling with a close match), a proposed target marked
+        # 'Confirmed', a confidence value outside the allowed three, a data
+        # type that disagrees with the ontology, or a vendor column the STTM
+        # dropped. Runs after the malformed-row loop because it reads cells
+        # by column, and before the contradiction loop so that loop sees the
+        # corrected rows.
+        ontology_attempts += 1
+        try:
+            corrected_draft = await openai_service.generate_document(
+                output_format=state["output_format"],
+                instruction_history=state["instruction_history"],
+                retrieved_context=state["retrieved_context"],
+                source_files=state.get("source_files", []),
+                ontology_context=ontology_context,
+                prior_draft=draft,
+                correction_feedback=ontology_service.correction_feedback(violations, unmapped),
+            )
+        except Exception:
+            # Best-effort improvement on an already-produced draft -- fall
+            # back to it rather than lose the document over an optional retry.
+            break
+        if prior_draft:
+            corrected_draft = draft_repair.restore_dropped_rows(
+                prior_draft, corrected_draft, state["current_instruction"]
+            )
+        if draft_repair.has_malformed_rows(corrected_draft):
+            # Don't trade an ontology issue for a column-shifted row.
+            break
+        draft = corrected_draft
+        violations = ontology_service.find_violations(draft, ontology) if ontology_context else []
+        unmapped = (
+            ontology_service.find_unmapped_source_columns(draft, state.get("source_files", []))
+            if check_coverage else []
+        )
+
+    if violations or unmapped:
+        telemetry.track_event("ontology_violations_unresolved", {
+            "session_id": state.get("session_id", ""),
+            "output_format": state.get("output_format", ""),
+            "project": ontology.project if ontology else "",
+            "ontology_version": ontology.version if ontology else "",
+            "attempts": ontology_attempts,
+            "violations": "; ".join(f"{v.kind}: {v.target}" for v in violations),
+            "unmapped_source_columns": ", ".join(unmapped),
+        })
+
     contradiction_attempts = 0
     contradictions = draft_repair.find_confirmed_confidence_contradictions(draft)
     placeholders = draft_repair.find_placeholder_open_questions(draft)
@@ -320,6 +426,7 @@ async def generate_node(state: PayerIQState) -> dict:
                 instruction_history=state["instruction_history"],
                 retrieved_context=state["retrieved_context"],
                 source_files=state.get("source_files", []),
+                ontology_context=ontology_context,
                 prior_draft=draft,
                 correction_feedback=" ".join(feedback_parts),
             )
@@ -348,14 +455,33 @@ async def generate_node(state: PayerIQState) -> dict:
             "placeholder_open_questions": ", ".join(placeholders),
         })
 
+    if ontology_context:
+        # Whatever the model did with the feedback above, a proposed target
+        # never ships as 'Confirmed' and an unknown one never ships above
+        # 'Needs SME Review'. Tags stripped again: a correction pass may
+        # have copied them back in.
+        draft = ontology_service.enforce_confidence(
+            ontology_service.strip_status_tags(draft), ontology
+        )
+
     draft = draft_repair.dedupe_repeated_rows(draft)
     return {"current_draft": draft, "content_filtered": False}
 
 
 async def groundedness_node(state: PayerIQState) -> dict:
+    # Target names, types and definitions come from the ontology, which
+    # isn't part of retrieved_context -- without it as a source, rows mapped
+    # straight from the ontology would score as ungrounded. Put first because
+    # content_safety_service caps the combined sources and trims from the end.
+    sources = [state["retrieved_context"]]
+    if ontology_service.applies_to(state.get("output_format", "")):
+        ontology = await ontology_service.get_ontology(_project_folder(state))
+        excerpt = ontology_service.grounding_excerpt(state["current_draft"], ontology)
+        if excerpt:
+            sources.insert(0, excerpt)
     result = await content_safety_service.check_groundedness(
         text=state["current_draft"],
-        grounding_sources=[state["retrieved_context"]],
+        grounding_sources=sources,
     )
     history = state.get("draft_history", [])
     history.append({
@@ -390,11 +516,18 @@ def prepare_retry_node(state: PayerIQState) -> dict:
     }
 
 
-def finalize_node(state: PayerIQState) -> dict:
+async def finalize_node(state: PayerIQState) -> dict:
+    # STTM fills the common STTM_Data_Ingestion_Template.xlsx itself (see
+    # template_service); other formats, or a missing template, get a plain
+    # one-sheet-per-section workbook as before.
+    template = (
+        await template_service.get_template() if state["output_format"] == "STTM" else None
+    )
     path = xlsx_builder.build_output(
         output_format=state["output_format"],
         content=state["current_draft"],
         session_id=state["session_id"],
+        template_bytes=template,
     )
     return {"status": "completed", "output_path": path}
 

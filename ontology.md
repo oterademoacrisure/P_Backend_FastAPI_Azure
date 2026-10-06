@@ -46,6 +46,161 @@ See §5, "Where `ontology.json` comes from" and "How a vendor column is matched"
 
 This section is the walkthrough to present. It follows one request from upload to download, says **who** does each step, and gives the evidence behind it. For the code-level detail (the exact prompt, every check, retry limits, telemetry), see [DRAFTING_AND_CHECKS.md](DRAFTING_AND_CHECKS.md). For how users, roles and client/project assignments decide which documents and ontology are used, see [ACCESS_AND_PROJECT_MAPPING.md](ACCESS_AND_PROJECT_MAPPING.md). Example: a user assigned to **Payment Integrity** uploads the Cotiviti overpayment file and ticks **STTM**.
 
+### End-to-end flow
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 1. Business user upload                                      │
+│──────────────────────────────────────────────────────────────│
+│ • One or more vendor Excel files                             │
+│   - data sheet                                               │
+│   - the vendor's own Data Dictionary sheet (column meanings) │
+│ • User instruction ("Create STTM for the attached file")     │
+│ • Ticked outputs: STTM / FRD / Agile                         │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│ 2. Security and access validation                            │
+│──────────────────────────────────────────────────────────────│
+│ • Project authorization: the user's admin-assigned project   │
+│   (not assigned → 403)                                       │
+│ • Prompt Shields: jailbreak / prompt injection in the        │
+│   instruction and in the uploaded files                      │
+│ • File parsing: .xlsx (every sheet), .docx, .pdf, .txt       │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+═══════════════ GATHER KNOWLEDGE (three sources) ═══════════════
+
+┌──────────────────────────────────────────────────────────────┐
+│ 3. Common enterprise documents  →  Azure AI Search (RAG)     │
+│──────────────────────────────────────────────────────────────│
+│ Hybrid keyword + vector search, filtered to the common root  │
+│ + the project's own folder; 2 best chunks per document       │
+│ • STTM Data Ingestion Template (sections, 22 columns)        │
+│ • Feature and User Story templates (Agile)                   │
+│ • Instruction document (enterprise guardrails, standards)    │
+│ • Data Mapping / Reporting Standards                         │
+│ (FRD: structure comes from the prompt; no FRD template yet)  │
+│ ROLE: how to WRITE the document                              │
+└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ 4. Project ontology (JSON)  →  read WHOLE, not searched      │
+│──────────────────────────────────────────────────────────────│
+│ Blob <client>/<project>/ontology.json, repo copy if Blob is  │
+│ unavailable; never another project's                         │
+│ Built from the Payer Data Dictionary + Glossary workbook:    │
+│ • Entities (35)            • Aliases (45)                    │
+│ • Attributes (387)         • Value sets (9)                  │
+│ • Relationships (44)       • Business rules (11)             │
+│ • Provider roles (5)       • Guardrails (18)                 │
+│ • Known issues (18)        • Status: approved / proposed     │
+│ ROLE: what to MAP TO                                         │
+└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ 5. Upload information  →  every sheet of every file          │
+│──────────────────────────────────────────────────────────────│
+│ • Column names (header row found under any title rows)       │
+│ • Source descriptions (vendor Data Dictionary sheet)         │
+│ • Sample rows                                                │
+│ ROLE: what to MAP FROM                                       │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+═══════════════════════ AI GENERATION ══════════════════════════
+
+┌──────────────────────────────────────────────────────────────┐
+│ 6. Prompt assembly                                           │
+│──────────────────────────────────────────────────────────────│
+│ System message = guardrails                                  │
+│                + COMPLETE ontology block (~11k tokens)       │
+│                + retrieved template and standards            │
+│ User message   = instruction + uploaded files (all sheets)   │
+│                + STTM format rules                           │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│ 7. Azure OpenAI (gpt-4.1-mini) drafts the STTM               │
+│──────────────────────────────────────────────────────────────│
+│ All 4 sections: Summary · Mapping · Assumptions and Open     │
+│ Questions · SME Checklist                                    │
+│ For each source column:                                      │
+│     source description   VS   ontology attribute definition  │
+│     (aliases speed up well-known names; not required)        │
+│ Business rules are cited in the Validation Rule column       │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+═════════════ VALIDATION LOOP (deterministic code) ═════════════
+
+┌──────────────────────────────────────────────────────────────┐
+│ 8. Structure check                                           │
+│ ✓ Every row has the right number of columns                  │
+└──────────────────────────────────────────────────────────────┘
+                               │
+┌──────────────────────────────────────────────────────────────┐
+│ 9. Ontology validation                                       │
+│ ✓ Target entity and attribute exist (no invented targets;    │
+│   a close match gets "did you mean …")                       │
+│ ✓ Data type matches the ontology (INT = INTEGER …)           │
+│ ✓ Confidence is Confirmed / Candidate / Needs SME Review     │
+│ ✓ No proposed (unapproved) target marked Confirmed           │
+│ ✓ Coverage: every column of every uploaded sheet is mapped   │
+│   or raised as an open question (first draft only)           │
+└──────────────────────────────────────────────────────────────┘
+                               │
+┌──────────────────────────────────────────────────────────────┐
+│ 10. Contradiction check                                      │
+│ ✓ No Confirmed row that also carries an open question        │
+│ ✓ Open questions written in full, not "see Q004"             │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                ┌──────────────┴──────────────┐
+                ▼                             ▼
+          Check fails                   Check passes
+                │                             │
+                ▼                             │
+  ┌──────────────────────────────┐            │
+  │ Specific feedback to the LLM │            │
+  │ → back to step 7             │            │
+  │ structure, contradictions: 3 │            │
+  │ ontology checks: 2 retries   │            │
+  └──────────────────────────────┘            │
+                │ retries used up             │
+                └──────────────┬──────────────┘
+                               ▼
+════════════ CONFIDENCE ENGINE (code has the last word) ════════
+
+┌──────────────────────────────────────────────────────────────┐
+│ 11. Enforce, whatever the AI wrote                           │
+│──────────────────────────────────────────────────────────────│
+│ • Column still missing     → row added: target TBD,          │
+│                              Needs SME Review                │
+│ • Target not in ontology   → at most Needs SME Review        │
+│ • Invalid confidence value → Needs SME Review                │
+│ • Proposed target          → at most Candidate               │
+│ • Matched by description   → at most Candidate               │
+│   only, or proposed alias                                    │
+│ • Confirmed ONLY when the column name = field name, or an    │
+│   approved alias links them                                  │
+│ Every capped row gets a written-out open question saying why │
+│ Unresolved problems → telemetry (Azure Monitor)              │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+═══════════════════════════ OUTPUT ═════════════════════════════
+
+┌──────────────────────────────────────────────────────────────┐
+│ 12. Groundedness (Azure AI Content Safety, indicative)       │
+│ 13. Fill the real STTM_Data_Ingestion_Template.xlsx          │
+│ 14. User reviews, refines (same session) and downloads       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Two guarantees come out of steps 9–11, whatever the AI writes:** every column of every uploaded sheet appears in the STTM, and nothing unproven is marked Confirmed.
+
 ### The three kinds of knowledge
 
 | Kind | Documents | Shared? | How the backend uses it |
@@ -906,6 +1061,19 @@ flowchart LR
 | **The PI content is a draft** | Built from two synthetic vendor samples (Cotiviti, vendor3) | SME approval (Phase 2); capped at "Candidate" until then |
 
 ---
+
+## 11a. Ideas to take it further (not built yet)
+
+The theme is a **closed loop**: SMEs approve or correct rows, approvals become reviewed ontology changes, and the next file maps with higher confidence.
+
+| Idea | What it does | Why it matters |
+|---|---|---|
+| **One-click SME approval** | Approve a Candidate row in the UI; its alias or field goes to the ontology as a pull request | Turns SME review into ontology growth without anyone editing JSON |
+| **Learning loop** | Every SME correction on a row becomes a `proposed` alias automatically | The next vendor file starts further ahead |
+| **Check the data, not just names** | Profile sample values against the target's data type and value set (a "Paid Date" column holding text isn't Confirmed) | A second kind of evidence beside names; catches junk or mislabelled columns |
+| **Quality dashboard** | Share of Confirmed / Candidate / Needs SME Review rows per vendor and project, plus the `ontology_violations_unresolved` rate | Shows progress and where SME time goes, from telemetry we already log |
+| **Golden-set regression** | Re-run approved STTMs on every prompt, model or ontology change and compare | Quality can't silently drop after a change |
+| **Scale across projects** | Shared dictionary core + small project files; a graph database only when lineage or impact questions need it | Keeps one copy of the dictionary as projects grow |
 
 ## 12. Decisions needed
 

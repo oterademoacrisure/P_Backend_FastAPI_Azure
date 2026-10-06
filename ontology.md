@@ -518,6 +518,64 @@ flowchart LR
 | Do we write a new one for each new input file? | **No.** One per project. A new vendor file is mapped against the same ontology, by meaning; columns it can't place become SME rows. SMEs may later add its column names as aliases. |
 | What still comes through RAG? | The template structure, the instruction document's rules and the standards. The dictionary is also still indexed (see "Recommended changes still open" #1). |
 
+### How hybrid search works, and what it gives us
+
+Azure AI Search supplies the **common documents**: the templates, the instruction document's guardrails, and the standards. Every search is **hybrid**: the same query runs as a keyword search and as a vector search, and Azure merges the two rankings. (The ontology and the uploaded files are not searched; they are given whole.)
+
+```mermaid
+flowchart LR
+    Q["Query<br/>'Payment Integrity: Create STTM<br/>for the attached vendor file'"] --> F["One search per allowed document<br/>(root + client + project folder),<br/>all at once, each filtered to that document"]
+    F --> K["Keyword search (BM25)<br/>exact words: STTM, NPI, DRG,<br/>Claim_ID, §20"]
+    F --> V["Vector search<br/>query embedded inside Azure AI Search<br/>(index's Azure OpenAI vectorizer, 1536 dims)<br/>nearest chunks by meaning"]
+    K --> R["Reciprocal Rank Fusion<br/>score = Σ 1 / (60 + rank)"]
+    V --> R
+    R --> T["Top 2 chunks per document<br/>labelled with source + relevance"]
+    T --> P["System message<br/>of the AI prompt"]
+```
+
+**Step by step** ([`azure_search_service.py`](app/services/azure_search_service.py)):
+
+| # | Step | Detail |
+|---|---|---|
+| 1 | **Build the query** | The project name plus the user's instruction, e.g. `Payment Integrity: Create STTM for the attached vendor file layout` |
+| 2 | **Pick the documents** | Only those in the container root, the client's folder and the project's folder; another project's files are never searched |
+| 3 | **Search each document separately, in parallel** | Each search is filtered to one document's path, so every document contributes; a strongly matching document can't crowd the others out |
+| 4 | **Keyword ranking** | Full-text (BM25) over the chunk text: rewards the exact words of the query |
+| 5 | **Vector ranking** | Azure AI Search embeds the query with the same Azure OpenAI vectorizer that embedded the chunks at indexing time, and finds the nearest chunks by meaning. The backend never calls an embedding model or holds its key. |
+| 6 | **Fuse** | Reciprocal Rank Fusion: each chunk scores `1/(60 + its keyword rank) + 1/(60 + its vector rank)`. A chunk that ranks well in **both** wins. |
+| 7 | **Keep the top 2 per document** | Labelled `[Source: <document> \| relevance <score>]` and placed in the AI's system message. A failed search is retried once; a document that still returns nothing is logged. |
+
+#### Example: why fusion picks better chunks
+
+Illustrative ranks, not measured. Query: `Payment Integrity: Create STTM for the attached vendor file layout`, searched in the instruction document.
+
+| Chunk of the instruction document | Keyword rank | Vector rank | Fused score (RRF) | Kept? |
+|---|---|---|---|---|
+| **A.** §10 STTM rules: "…Source-to-Target Mapping… if a target column has no source, Set as Default Value…" | 1 (contains "STTM") | 2 | 1/61 + 1/62 = **0.0325** | ✅ 1st |
+| **B.** §20 Mapping confidence: "…Confirmed, Candidate, Needs SME Review… never invent source fields…" | 5 (few query words) | 1 (same meaning: mapping a vendor layout) | 1/65 + 1/61 = **0.0318** | ✅ 2nd |
+| **C.** A section on Payment Integrity reporting KPIs: "…Payment Integrity recovery rate…" | 2 (repeats "Payment Integrity") | 9 (different topic) | 1/62 + 1/69 = **0.0306** | ❌ |
+
+- **Keyword search alone** would keep A and **C**: C only *repeats the words* "Payment Integrity", and the mapping-confidence rules in B would be lost.
+- **Vector search alone** finds A and B here, but misses exact terms in other requests (below).
+- **Hybrid** keeps A and B, the two chunks that actually govern an STTM.
+
+#### What we gain from hybrid search
+
+| Request contains | Keyword search alone | Vector search alone | Hybrid |
+|---|---|---|---|
+| Exact codes and names: "NPI", "DRG", "COB", `Claim_ID`, "§20" | ✅ finds them exactly | ⚠️ may return text that is merely *about* providers or claims | ✅ |
+| Paraphrase: "map the vendor layout" vs a document that says "source-to-target mapping" | ❌ different words, no match | ✅ same meaning | ✅ |
+| A generic word repeated everywhere ("claim", "Payment Integrity") | ⚠️ over-ranks any chunk that repeats it | ✅ judges the topic | ✅ fusion demotes it |
+| A refine instruction: "add a validation rule to the Units row" | ✅ "validation rule" | ✅ validation-standards text | ✅ both agree, high confidence |
+
+Further benefits of how we run it:
+- **Every document contributes**, through one filtered search per document instead of one blended top-k.
+- **Project isolation**: the folder filter means another project's documents never ground this one.
+- **Request-specific context**: chunks are chosen for *this* instruction and never cached across requests (only the list of documents is cached, for 15 minutes).
+- **No embedding code in the backend**: the query is embedded inside Azure AI Search by the same vectorizer as the index, so the query and chunks always use the same model.
+
+**Limits, and why the ontology isn't searched:** hybrid search still returns **2 chunks per document**. That is right for guidance, where the best two passages are enough, but wrong for the target model, where the AI must see all 387 fields. The semantic ranker is configured on the index but **not used**: when tested it added about 100 ms and ranked the STTM template lower than plain hybrid for an STTM query. There is no relevance floor yet (`MIN_RELEVANCE_SCORE = 0`), because fused scores aren't on a 0–1 scale; one can be set once typical scores for this index are known.
+
 ### How a vendor column is matched, even if it's renamed
 
 Matching is done by **meaning, not by name**. The AI is given the vendor's description of each column (from the file's Data Dictionary sheet) **and** the definition of every target attribute (from the project ontology), and it pairs them up. Aliases only speed up the common, well-named cases; they aren't required.

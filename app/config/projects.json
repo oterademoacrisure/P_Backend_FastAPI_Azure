@@ -6,7 +6,6 @@
       "clientName": "Excellus",
       "projects": [
         { "projectId": "payment-integrity", "projectName": "Payment Integrity" },
-        { "projectId": "medical-claims", "projectName": "Medical Claims" },
         { "projectId": "correspondence-mapping", "projectName": "Correspondence mapping" }
       ]
     },

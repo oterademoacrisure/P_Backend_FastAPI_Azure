@@ -1,4 +1,7 @@
 """
+GET /v2/admin/users -- lists every User/Role/ClientID/ProjectID mapping,
+optionally searched by project (?project_id=payment), for the admin page.
+
 POST /v2/admin/users -- saves a UserName -> Role/ClientID/ProjectID mapping
 from the frontend's admin "Register user" page
 (Payeriq-Frontend/src/pages/AdminRegisterPage.jsx, request sent by
@@ -44,6 +47,21 @@ async def list_projects(admin: dict = Depends(require_admin)):
     list the backend validates against, so the page can't offer a project
     the backend would reject."""
     return {"clients": project_registry.clients()}
+
+
+@router.get("/users")
+async def list_user_mappings(project_id: str = "", admin: dict = Depends(require_admin)):
+    """Every User / Role / ClientID / ProjectID mapping, for the admin
+    page's user list. `project_id` filters to projects whose id or name
+    contains it ("payment" finds payment-integrity)."""
+    try:
+        return {"users": await auth_service.list_user_mappings(project_id)}
+    except RuntimeError as e:
+        logger.error("User mapping is misconfigured: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="User mapping is not available (service misconfigured).",
+        )
 
 
 @router.post("/users", status_code=201)

@@ -455,6 +455,16 @@ async def generate_node(state: PayerIQState) -> dict:
             "placeholder_open_questions": ", ".join(placeholders),
         })
 
+    if check_coverage:
+        # Every column of every uploaded file must reach the deliverable:
+        # whatever the model still dropped -- after all the retries above,
+        # any of which could drop rows again -- becomes an SME-review row.
+        draft = ontology_service.add_unmapped_rows(
+            draft,
+            state.get("source_files", []),
+            ontology_service.find_unmapped_source_columns(draft, state.get("source_files", [])),
+        )
+
     if ontology_context:
         # Whatever the model did with the feedback above, a proposed target
         # never ships as 'Confirmed' and an unknown one never ships above

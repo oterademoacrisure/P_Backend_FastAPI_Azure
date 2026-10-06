@@ -332,6 +332,47 @@ async def get_user_mappings(username: str) -> list[dict]:
         ]
 
 
+async def _query_all_mappings() -> list[dict]:
+    async with CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY) as client:
+        query = (
+            "SELECT c.UserName, c.Role, c.ClientID, c.ProjectID, c.createdAt, c.createdBy "
+            "FROM c WHERE c.type = 'userMapping'"
+        )
+        return [item async for item in _mapping_container(client).query_items(query=query)]
+
+
+async def list_user_mappings(project_query: str = "") -> list[dict]:
+    """Every user -> client/project mapping, for the admin page's user list,
+    optionally only those whose project id or name contains `project_query`
+    (case-insensitive, so "payment" finds payment-integrity). Ids are shown
+    as the registry spells them, so a mapping saved as "Payment Integrity"
+    before the registry existed lists as payment-integrity. A mapping whose
+    project is no longer registered (e.g. the removed medical-claims) keeps
+    its stored ids and is flagged "registered": False -- that user can no
+    longer generate for it and should be reassigned."""
+    if not (COSMOS_ENDPOINT and COSMOS_KEY):
+        raise RuntimeError("AZURE_COSMOS_ENDPOINT / AZURE_COSMOS_KEY are not set.")
+    needle = (project_query or "").strip().lower()
+    rows = []
+    for item in await _query_all_mappings():
+        project = project_registry.resolve(item.get("ClientID"), item.get("ProjectID"))
+        row = {
+            "UserName": item.get("UserName", ""),
+            "Role": item.get("Role", ""),
+            "ClientID": project.client_id if project else item.get("ClientID", ""),
+            "ProjectID": project.project_id if project else item.get("ProjectID", ""),
+            "projectName": project.project_name if project else item.get("ProjectID", ""),
+            "registered": project is not None,
+            "createdAt": item.get("createdAt", ""),
+            "createdBy": item.get("createdBy", ""),
+        }
+        if needle and needle not in row["ProjectID"].lower() and needle not in row["projectName"].lower():
+            continue
+        rows.append(row)
+    rows.sort(key=lambda r: (r["ClientID"].lower(), r["ProjectID"].lower(), r["UserName"].lower()))
+    return rows
+
+
 # Login roles that get admin rights (the Register user page, every
 # project). Existing admin accounts were created with role "superuser", new
 # ones from the Register page get "admin". Comma-separated, case-insensitive.

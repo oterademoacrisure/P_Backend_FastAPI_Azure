@@ -86,6 +86,7 @@ _FIELD_COLUMN = "target field name"
 _TYPE_COLUMN = "target data type"
 _CONFIDENCE_COLUMN = "mapping confidence"
 _OPEN_QUESTION_COLUMN = "open question"
+_SOURCE_COLUMN = "source field"
 
 # Normalizes the type spellings a model or source system tends to use onto
 # the dictionary's own seven types, so "INT" vs "INTEGER" isn't a mismatch.
@@ -129,6 +130,15 @@ class Ontology:
         self.entity_status: dict[str, str] = {}
         self.entity_names: dict[str, str] = {}               # norm -> canonical
         self.attributes: dict[str, dict[str, Attribute]] = {}  # norm entity -> norm attr -> Attribute
+        # (norm entity, norm attr) -> {norm alias: status}, the evidence that
+        # lets a source column be 'Confirmed' to a target (see evidence()).
+        self.alias_index: dict[tuple[str, str], dict[str, str]] = {}
+        for al in raw.get("aliases", []):
+            entity, _, attr = al.get("target", "").partition(".")
+            names = self.alias_index.setdefault((_norm(entity), _norm(attr)), {})
+            for name in al.get("aliases", []):
+                if names.get(_norm(name)) != "approved":
+                    names[_norm(name)] = al.get("status", "approved")
         for e in raw.get("entities", []):
             key = _norm(e["name"])
             self.entity_names[key] = e["name"]
@@ -162,6 +172,22 @@ class Ontology:
         attrs = self.attributes.get(entity_key, {})
         match = difflib.get_close_matches(_norm(name), list(attrs), n=1, cutoff=0.75)
         return attrs[match[0]].name if match else None
+
+    def evidence(self, source: str, entity_key: str, attr_key: str) -> str:
+        """How a draft's Source Field cell is tied to its target, beyond the
+        model's own judgment: "name" (it is the attribute's name, optionally
+        prefixed with the entity's: 'Claim ID', 'Member First Name'), the
+        status of the alias it matches ("approved" / "proposed"), or "" --
+        matched by description only, which is how a column named after a
+        person once got a confident target. A file or sheet prefix
+        ('Input.xlsx.Claim Number') and a trailing note are ignored."""
+        cleaned = re.sub(r"\(.*?\)|\[.*?\]|[`'\"]", "", source or "")
+        candidates = {_norm(cleaned), _norm(re.split(r"[.>:]", cleaned)[-1])} - {""}
+        if candidates & {attr_key, f"{entity_key} {attr_key}"}:
+            return "name"
+        aliases = self.alias_index.get((entity_key, attr_key), {})
+        statuses = {aliases[c] for c in candidates if c in aliases}
+        return "approved" if "approved" in statuses else next(iter(statuses), "")
 
 
 def load_file(path: str, project: str = "") -> Ontology:
@@ -449,18 +475,44 @@ def _base_type(value: str) -> str:
     return _TYPE_SYNONYMS.get(token, "")
 
 
-def _check_row(ontology: Ontology, row: dict[str, str]) -> tuple[str | None, list[Violation]]:
+def _check_row(ontology: Ontology, row: dict[str, str]) -> tuple[str | None, list[Violation], str]:
     """Returns (the confidence this row must be capped at, if any; its
-    violations). The cap is 'Candidate' for a proposed target and 'Needs SME
-    Review' for a target not in the ontology at all."""
+    violations; the reason for a 'Candidate' cap, for the Open Question).
+    The cap is 'Needs SME Review' for a target not in the ontology at all,
+    and 'Candidate' for a proposed target or for a source column tied to
+    its target by description only (see Ontology.evidence)."""
     entity_cell = _entity_value(row).strip()
     field_cell = draft_repair._row_value(row, _FIELD_COLUMN).strip()
     confidence = draft_repair._row_value(row, _CONFIDENCE_COLUMN).strip().lower()
     confirmed = confidence == "confirmed"
     if _is_blank(entity_cell) or _is_blank(field_cell):
-        return None, []
+        return None, [], ""
     target = f"{entity_cell}.{field_cell}"
+    cap, violations = _check_target(ontology, row, entity_cell, field_cell, target, confirmed)
+    if cap is not None:
+        reason = "it is a proposed ontology item awaiting SME approval" if cap == "candidate" else ""
+        return cap, violations, reason
 
+    # Target is approved and known: 'Confirmed' still needs the source
+    # column itself to point at it. Not a violation -- a retry can't add
+    # evidence, so this is capped in code (enforce_confidence) instead.
+    # A blank source is a default-value row, governed by the prompt's rule.
+    source = draft_repair._row_value(row, _SOURCE_COLUMN).strip()
+    if _is_blank(source):
+        return None, violations, ""
+    entity_key = ontology.find_entity(entity_cell)
+    found = ontology.evidence(source, entity_key, _norm(field_cell))
+    if found in ("name", "approved"):
+        return None, violations, ""
+    how = "a proposed alias awaiting SME approval" if found == "proposed" else "description only"
+    return "candidate", violations, (
+        f"source column '{source}' was matched to it by {how}, not by name or an approved alias"
+    )
+
+
+def _check_target(
+    ontology: Ontology, row: dict[str, str], entity_cell: str, field_cell: str, target: str, confirmed: bool
+) -> tuple[str | None, list[Violation]]:
     entity_key = ontology.find_entity(entity_cell)
     if entity_key is None:
         suggestion = ontology.suggest_entity(entity_cell)
@@ -549,16 +601,28 @@ def find_violations(draft: str, ontology: Ontology | None) -> list[Violation]:
 
 def _source_columns(text: str) -> list[str]:
     """Column names of an uploaded spreadsheet, from file_extraction's text
-    form (one ', '-joined line per row): the first of the leading lines with
-    at least 5 cells that are all short, non-numeric labels -- skipping any
-    title rows above the header. [] for anything else (prose, PDFs)."""
+    form (one ', '-joined line per row): the widest of the first 15 lines
+    whose cells (2 or more) are all short, non-numeric labels. Widest, not
+    first, so a 'Vendor, Cotiviti' title row above a 3-column header isn't
+    taken for it; a data row has numbers or dates, which disqualify it.
+    Call it through _file_columns, which skips non-spreadsheet uploads:
+    in prose any line with a comma would qualify."""
+    best: list[str] = []
     for line in text.splitlines()[:15]:
         cells = [c.strip() for c in line.split(", ")]
-        if len(cells) >= 5 and all(
+        if len(cells) > max(len(best), 1) and all(
             c and len(c) <= 60 and not re.fullmatch(r"[\d.\-/: ]+", c) for c in cells
         ):
-            return cells
-    return []
+            best = cells
+    return best
+
+
+def _file_columns(source_file: dict) -> list[str]:
+    """Column names of one uploaded file; [] unless it is a spreadsheet
+    (file_extraction turns .docx/.pdf/.txt into prose, which has no columns)."""
+    if not source_file.get("filename", "").lower().endswith((".xlsx", ".xls")):
+        return []
+    return _source_columns(source_file.get("text", ""))
 
 
 def find_unmapped_source_columns(draft: str, source_files: list[dict]) -> list[str]:
@@ -578,10 +642,59 @@ def find_unmapped_source_columns(draft: str, source_files: list[dict]) -> list[s
             mentioned += " | " + _norm(body)
     unmapped = []
     for f in source_files:
-        for column in _source_columns(f.get("text", "")):
+        for column in _file_columns(f):
             if _norm(column) not in mentioned and column not in unmapped:
                 unmapped.append(column)
     return unmapped
+
+
+def add_unmapped_rows(draft: str, source_files: list[dict], unmapped: list[str]) -> str:
+    """Appends a 'Needs SME Review' STTM Mapping row for each of `unmapped`
+    (find_unmapped_source_columns' result once the model's retries ran
+    out), so every column of every uploaded file appears in the
+    deliverable -- before this they were only logged to telemetry.
+    The target is left as 'TBD' rather than guessed in code."""
+    mapping = _mapping_columns(draft)
+    if not unmapped or mapping is None:
+        return draft
+    title, columns, rows = mapping
+    lower = {c.lower(): c for c in columns}
+    if _SOURCE_COLUMN not in lower:
+        return draft  # nowhere to name the column; coverage can't be shown
+    id_col = columns[0] if "id" in columns[0].lower() else None
+    numbers = [re.match(r"(\D*)(\d+)$", r.get(id_col, "").strip()) for r in rows] if id_col else []
+    numbers = [m for m in numbers if m]
+    prefix = numbers[-1].group(1) if numbers else "M-"
+    width = len(numbers[-1].group(2)) if numbers else 3
+    next_id = max((int(m.group(2)) for m in numbers), default=0) + 1
+
+    for column in unmapped:
+        filename = next(
+            (f.get("filename", "") for f in source_files if column in _file_columns(f)), ""
+        )
+        row = {c: "" for c in columns}
+        if id_col:
+            row[id_col] = f"{prefix}{next_id:0{width}d}"
+            next_id += 1
+        for c in columns:
+            cl = c.lower()
+            if cl.startswith(_ENTITY_COLUMN_PREFIXES) or cl == _FIELD_COLUMN:
+                row[c] = "TBD"
+            elif cl.startswith("source") and ("file" in cl or "table" in cl or "system" in cl):
+                row[c] = filename
+        row[lower[_SOURCE_COLUMN]] = column
+        if _CONFIDENCE_COLUMN in lower:
+            row[lower[_CONFIDENCE_COLUMN]] = "Needs SME Review"
+        if _OPEN_QUESTION_COLUMN in lower:
+            row[lower[_OPEN_QUESTION_COLUMN]] = (
+                f"Source column '{column}'{' in ' + filename if filename else ''} has no target in this "
+                f"draft: SME to name its target entity and field, or confirm it is out of scope."
+            )
+        rows.append(row)
+    return "\n\n".join(
+        f"## {t}\n{draft_repair._render_table(columns, rows) if t == title else body}"
+        for t, body in split_sections(draft)
+    )
 
 
 def correction_feedback(violations: list[Violation], unmapped: list[str] | None = None) -> str:
@@ -645,7 +758,7 @@ def enforce_confidence(draft: str, ontology: Ontology | None) -> str:
                 row[question_col] = value
             row[confidence_col] = "Needs SME Review"
             changed = True
-        cap, _ = _check_row(ontology, row)
+        cap, _, reason = _check_row(ontology, row)
         current = row.get(confidence_col, "").strip().lower()
         if cap is None or _CONFIDENCE_RANK.get(current, 2) >= _CONFIDENCE_RANK[cap]:
             continue
@@ -653,7 +766,7 @@ def enforce_confidence(draft: str, ontology: Ontology | None) -> str:
         if question_col and _is_blank(row.get(question_col, "")):
             target = f"{_entity_value(row).strip()}.{draft_repair._row_value(row, _FIELD_COLUMN).strip()}"
             row[question_col] = (
-                f"Confirm {target}: it is a proposed ontology item awaiting SME approval."
+                f"Confirm {target}: {reason}."
                 if cap == "candidate"
                 else f"Confirm target {target}: it is not in the canonical ontology."
             )
